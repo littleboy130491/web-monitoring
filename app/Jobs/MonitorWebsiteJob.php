@@ -5,12 +5,12 @@ namespace App\Jobs;
 use App\Models\Website;
 use App\Models\MonitoringResult;
 use App\Models\User;
-use Filament\Notifications\Notification;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Spatie\Browsershot\Browsershot;
+use Filament\Notifications\Notification;
 
 class MonitorWebsiteJob implements ShouldQueue
 {
@@ -92,11 +92,13 @@ class MonitorWebsiteJob implements ShouldQueue
                 $result['ssl_info'] = $sslInfo ? json_encode($sslInfo) : null;
             }
 
-            // Take screenshot if requested
-            if ($this->takeScreenshot) {
-                \Log::info("Screenshot requested for {$this->website->name}");
+            // Take screenshot if requested and website is up
+            if ($this->takeScreenshot && $result['status'] === 'up') {
+                \Log::info("Screenshot requested for {$this->website->url} (status: up)");
                 $result['screenshot_path'] = $this->takeScreenshot();
                 \Log::info("Screenshot result: " . ($result['screenshot_path'] ?? 'null'));
+            } elseif ($this->takeScreenshot && $result['status'] !== 'up') {
+                \Log::info("Screenshot skipped for {$this->website->url} (status: {$result['status']})");
             }
 
         } catch (GuzzleException $e) {
@@ -111,46 +113,8 @@ class MonitorWebsiteJob implements ShouldQueue
 
         $monitoringResult = MonitoringResult::create($result);
 
-        // Send notifications to all users
-        $users = User::all();
-
-        foreach ($users as $user) {
-            $title = match ($result['status']) {
-                'up' => "✅ {$this->website->name} is Online",
-                'down' => "❌ {$this->website->name} is Down",
-                'error' => "⚠️ Failed to Monitor {$this->website->name}",
-                'warning' => "⚠️ {$this->website->name} has Issues",
-                default => "📊 Monitoring Complete for {$this->website->name}",
-            };
-
-            $body = "Status: {$result['status']}";
-            if ($result['response_time']) {
-                $body .= " | Response: {$result['response_time']}ms";
-            }
-            if ($result['error_message']) {
-                $body .= " | Error: {$result['error_message']}";
-            }
-            if ($result['content_changed']) {
-                $body .= " | Content changed!";
-            }
-
-            $color = match ($result['status']) {
-                'up' => 'success',
-                'down' => 'danger',
-                'error' => 'danger',
-                'warning' => 'warning',
-                default => 'info',
-            };
-
-            $user->notify(
-                Notification::make()
-                    ->title($title)
-                    ->body($body)
-                    ->color($color)
-                    ->toDatabase()
-            );
-        }
-
+        // Send notifications for status changes and important events
+        $this->sendNotifications($monitoringResult);
     }
 
     private function getSSLInfo(string $url): ?array
@@ -207,40 +171,15 @@ class MonitorWebsiteJob implements ShouldQueue
                 mkdir($dir, 0755, true);
             }
 
-            // Check if we're in a Docker/Sail environment
-            $chromePath = $this->getChromePath();
-            if (!$chromePath) {
-                \Log::warning("Chrome not found - skipping screenshot for {$this->website->name}");
-                return null;
-            }
+            \Log::info("Taking screenshot for {$this->website->url}");
 
-            \Log::info("Taking screenshot for {$this->website->name} using Chrome at: {$chromePath}");
-
-            // Create Browsershot instance with improved configuration
-            $browsershot = Browsershot::url($this->website->url)
-                ->setChromePath($chromePath)
+            // Use Browsershot with Docker-compatible Chrome settings
+            Browsershot::url($this->website->url)
+                ->setChromePath('/usr/bin/google-chrome')
                 ->noSandbox()
-                ->dismissDialogs()
-                ->windowSize(1920, 1080)
-                ->userAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
-                ->waitUntilNetworkIdle(true) // Changed to true for better page loading
-                ->timeout(60) // Increased timeout
-                ->setOption('args', [
-                    '--disable-web-security',
-                    '--disable-features=IsolateOrigins',
-                    '--disable-features=site-per-process',
-                    '--no-first-run',
-                    '--disable-gpu',
-                    '--disable-dev-shm-usage',
-                    '--disable-extensions',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding'
-                ])
-                ->setOption('headless', 'new'); // Use new headless mode
-
-            // Take the screenshot
-            $browsershot->save($fullPath);
+                ->setOption('disable-dev-shm-usage', true)
+                ->setOption('disable-gpu', true)
+                ->save($fullPath);
 
             // Verify the file was created and has content
             if (file_exists($fullPath) && filesize($fullPath) > 0) {
@@ -248,89 +187,101 @@ class MonitorWebsiteJob implements ShouldQueue
                 return $filename;
             } else {
                 \Log::error("Screenshot file was created but is empty: {$filename}");
-                // Try to get more information about what went wrong
-                if (file_exists($fullPath)) {
-                    \Log::error("File exists but is empty. Size: " . filesize($fullPath) . " bytes");
-                } else {
-                    \Log::error("File was not created at all");
-                }
                 return null;
             }
 
         } catch (\Exception $e) {
-            \Log::error("Screenshot failed for {$this->website->name}: " . $e->getMessage());
-            \Log::error("Screenshot stack trace: " . $e->getTraceAsString());
-            // Log additional debugging information
-            \Log::error("Website URL: {$this->website->url}");
-            \Log::error("Full path: {$fullPath}");
+            \Log::error("Screenshot failed for {$this->website->url}: " . $e->getMessage());
             return null;
         }
     }
 
-    private function getChromePath(): ?string
+    private function sendNotifications(MonitoringResult $result): void
     {
-        // Check if we're in a Docker/Sail environment
-        $isSail = env('LARAVEL_SAIL', false);
+        // Get the previous monitoring result to check for status changes
+        $previousResult = $this->website->monitoringResults()
+            ->where('id', '!=', $result->id)
+            ->latest()
+            ->first();
 
-        if ($isSail) {
-            // In Sail environment, Chromium is typically at this path
-            $sailChromePath = '/usr/bin/chromium-browser';
-            if (file_exists($sailChromePath) && is_executable($sailChromePath)) {
-                \Log::info("Found Chrome in Sail environment: {$sailChromePath}");
-                return $sailChromePath;
+        $users = User::all(); // Send to all users, you can customize this logic
+
+        foreach ($users as $user) {
+            // Notification for status changes (down to up, up to down, etc.)
+            if ($previousResult && $previousResult->status !== $result->status) {
+                $this->sendStatusChangeNotification($user, $result, $previousResult);
+            }
+
+            // Notification for errors
+            if ($result->status === 'error') {
+                $this->sendErrorNotification($user, $result);
+            }
+
+            // Notification for content changes
+            if ($result->content_changed) {
+                $this->sendContentChangeNotification($user, $result);
+            }
+
+            // Notification for successful monitoring with screenshot
+            if ($result->status === 'up' && $result->screenshot_path) {
+                $this->sendScreenshotNotification($user, $result);
             }
         }
+    }
 
-        // Common Chrome/Chromium paths to check
-        $paths = [
-            '/usr/bin/google-chrome',
-            '/usr/bin/google-chrome-stable',
-            '/usr/bin/chromium',
-            '/usr/bin/chromium-browser',
-            '/snap/bin/chromium',
-            '/opt/google/chrome/chrome',
-            '/usr/bin/chrome',
-            '/usr/local/bin/chrome',
-            '/usr/local/bin/google-chrome'
-        ];
+    private function sendStatusChangeNotification(User $user, MonitoringResult $result, MonitoringResult $previousResult): void
+    {
+        $color = match ($result->status) {
+            'up' => 'success',
+            'down' => 'danger',
+            'error' => 'danger',
+            'warning' => 'warning',
+            default => 'info',
+        };
 
-        foreach ($paths as $path) {
-            if (file_exists($path) && is_executable($path)) {
-                \Log::info("Found Chrome at: {$path}");
-                return $path;
-            }
-        }
+        $icon = match ($result->status) {
+            'up' => 'heroicon-o-check-circle',
+            'down' => 'heroicon-o-x-circle',
+            'error' => 'heroicon-o-exclamation-triangle',
+            'warning' => 'heroicon-o-exclamation-circle',
+            default => 'heroicon-o-information-circle',
+        };
 
-        // Try to find Chrome using which command
-        try {
-            $result = shell_exec('which google-chrome 2>/dev/null');
-            if ($result && trim($result)) {
-                \Log::info("Found Chrome via which: " . trim($result));
-                return trim($result);
-            }
+        Notification::make()
+            ->title('Website Status Changed')
+            ->body("{$this->website->url} changed from {$previousResult->status} to {$result->status}")
+            ->icon($icon)
+            ->color($color)
+            ->sendToDatabase($user);
+    }
 
-            $result = shell_exec('which chromium 2>/dev/null');
-            if ($result && trim($result)) {
-                \Log::info("Found Chromium via which: " . trim($result));
-                return trim($result);
-            }
+    private function sendErrorNotification(User $user, MonitoringResult $result): void
+    {
+        Notification::make()
+            ->title('Website Monitoring Error')
+            ->body("{$this->website->url}: {$result->error_message}")
+            ->icon('heroicon-o-exclamation-triangle')
+            ->color('danger')
+            ->sendToDatabase($user);
+    }
 
-            $result = shell_exec('which chrome 2>/dev/null');
-            if ($result && trim($result)) {
-                \Log::info("Found Chrome via which: " . trim($result));
-                return trim($result);
-            }
-        } catch (\Exception $e) {
-            \Log::error("Error finding Chrome: " . $e->getMessage());
-        }
+    private function sendContentChangeNotification(User $user, MonitoringResult $result): void
+    {
+        Notification::make()
+            ->title('Content Changed')
+            ->body("{$this->website->url} content has changed")
+            ->icon('heroicon-o-document-text')
+            ->color('info')
+            ->sendToDatabase($user);
+    }
 
-        // Check if we're in a Docker/Sail environment and use the appropriate path
-        if (file_exists('/usr/bin/chromium-browser') && is_executable('/usr/bin/chromium-browser')) {
-            \Log::info("Using Docker Chromium path: /usr/bin/chromium-browser");
-            return '/usr/bin/chromium-browser';
-        }
-
-        \Log::error("No Chrome/Chromium found in any common locations");
-        return null;
+    private function sendScreenshotNotification(User $user, MonitoringResult $result): void
+    {
+        Notification::make()
+            ->title('Screenshot Captured')
+            ->body("{$this->website->url} is up and screenshot captured successfully")
+            ->icon('heroicon-o-camera')
+            ->color('success')
+            ->sendToDatabase($user);
     }
 }
