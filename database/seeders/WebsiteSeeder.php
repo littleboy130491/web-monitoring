@@ -37,9 +37,35 @@ class WebsiteSeeder extends Seeder
             
             $website = array_combine($header, $data);
             
-            // Convert string boolean to actual boolean
-            $website['is_active'] = (bool) $website['is_active'];
-            $website['check_interval'] = (int) $website['check_interval'];
+            // Handle required URL field
+            if (empty($website['url'])) {
+                $this->command->warn("Skipping line with missing URL: {$line}");
+                continue;
+            }
+            
+            // Set default name from URL if empty
+            if (empty($website['name'])) {
+                $website['name'] = parse_url($website['url'], PHP_URL_HOST) ?: $website['url'];
+            }
+            
+            // Set default description (empty is fine)
+            if (empty($website['description'])) {
+                $website['description'] = null;
+            }
+            
+            // Set default is_active to true if empty or not set
+            if ($website['is_active'] === '' || $website['is_active'] === null) {
+                $website['is_active'] = true;
+            } else {
+                $website['is_active'] = (bool) ((int) $website['is_active']);
+            }
+            
+            // Set default check_interval to 3600 seconds if empty
+            if ($website['check_interval'] === '' || $website['check_interval'] === null) {
+                $website['check_interval'] = 3600;
+            } else {
+                $website['check_interval'] = (int) $website['check_interval'];
+            }
             
             Website::create($website);
         }

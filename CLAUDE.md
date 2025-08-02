@@ -10,13 +10,22 @@ This is a Laravel 12.x web monitoring application with a complete web interface 
 
 ### Full Development Environment
 ```bash
+composer dev-simple
+```
+This runs a stable development stack with:
+- PHP development server (`php artisan serve`)
+- Vite frontend build (`npm run dev`)
+
+**Alternative (with queue and logs)**:
+```bash
 composer dev
 ```
 This runs a complete development stack with:
 - PHP development server (`php artisan serve`)
 - Queue worker (`php artisan queue:listen --tries=1`)
-- Log monitoring (`php artisan pail --timeout=0`)
 - Vite frontend build (`npm run dev`)
+
+Note: The `composer dev-simple` command is recommended for stable operation, as the full stack can sometimes cause process conflicts.
 
 ### Individual Commands
 - **Start PHP server**: `php artisan serve`
@@ -35,6 +44,13 @@ This runs a complete development stack with:
 - **Custom timeout**: `php artisan monitor:websites --timeout=60`
 - **Seed sample websites**: `php artisan db:seed --class=WebsiteSeeder`
 - **Create admin user**: Use tinker to create users for admin panel access
+
+### Data Management Commands
+- **Prune old data (30 days)**: `php artisan monitor:prune`
+- **Prune with custom retention**: `php artisan monitor:prune --days=7`
+- **Dry run (preview only)**: `php artisan monitor:prune --dry-run`
+- **Keep screenshots**: `php artisan monitor:prune --keep-screenshots`
+- **Combined options**: `php artisan monitor:prune --days=14 --dry-run`
 
 ### Testing
 - Run all tests: `composer test`
@@ -112,7 +128,7 @@ Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome:
 - **Features**:
   - Website management with full CRUD operations
   - URL validation and custom header configuration
-  - Real-time monitoring triggers from admin interface
+  - **Stable monitoring buttons**: Individual and bulk monitoring via HTTP forms
   - Read-only monitoring results with detailed info lists
   - Advanced filtering and search capabilities
   - Dashboard with overview statistics and trend charts
@@ -120,6 +136,7 @@ Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome:
   - Copy functionality for debugging data
   - Color-coded status indicators throughout
   - Mobile-responsive admin interface
+  - **Crash-free operation**: Uses traditional HTTP forms instead of Livewire actions
 
 ### Public Status Page
 - **URL**: `/` or `/status`
@@ -134,6 +151,14 @@ Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome:
 
 ### Data Management
 - **CSV Import**: Websites can be imported via CSV files in `storage/app/websites.csv`
+  - **Required field**: `url` (only field that must be provided)
+  - **Optional fields with defaults**:
+    - `name`: Auto-generated from URL hostname if empty
+    - `description`: Can be empty (null)
+    - `is_active`: Defaults to `true` (1) if empty
+    - `check_interval`: Defaults to `3600` seconds (1 hour) if empty
+  - **CSV Format**: `name,url,description,is_active,check_interval`
+  - **Example**: `,https://example.com,My website,,` (all fields except URL can be empty)
 - **JSON Storage**: Headers stored as JSON strings with copy functionality
 - **Read-only Results**: Monitoring results cannot be manually created/edited
 - **Screenshot Storage**: Screenshots saved to `storage/app/public/screenshots/`

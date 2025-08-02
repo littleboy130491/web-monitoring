@@ -94,7 +94,7 @@ class MonitorWebsites extends Command
             
             $result['response_time'] = (int) (($endTime - $startTime) * 1000);
             $result['status_code'] = $response->getStatusCode();
-            $result['headers'] = $response->getHeaders();
+            $result['headers'] = json_encode($response->getHeaders());
             
             $content = $response->getBody()->getContents();
             $result['content_hash'] = hash('sha256', $content);
@@ -117,7 +117,8 @@ class MonitorWebsites extends Command
 
             // SSL info for HTTPS
             if (str_starts_with($website->url, 'https://')) {
-                $result['ssl_info'] = $this->getSSLInfo($website->url);
+                $sslInfo = $this->getSSLInfo($website->url);
+                $result['ssl_info'] = $sslInfo ? json_encode($sslInfo) : null;
             }
 
             // Take screenshot if requested
@@ -235,7 +236,7 @@ class MonitorWebsites extends Command
         }
 
         if ($result['ssl_info']) {
-            $ssl = $result['ssl_info'];
+            $ssl = json_decode($result['ssl_info'], true);
             $this->line("   SSL: Expires in {$ssl['expires_in_days']} days");
         }
 

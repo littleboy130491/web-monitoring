@@ -18,11 +18,11 @@ class MonitoringResultResource extends Resource
     protected static ?string $model = MonitoringResult::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
-    
+
     protected static ?string $navigationGroup = 'Monitoring';
-    
+
     protected static ?string $navigationLabel = 'Results';
-    
+
     protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
@@ -43,9 +43,9 @@ class MonitoringResultResource extends Resource
                     ->label('Website'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'up' => 'success',
-                        'down' => 'danger', 
+                        'down' => 'danger',
                         'error' => 'danger',
                         'warning' => 'warning',
                         default => 'gray',
@@ -53,7 +53,7 @@ class MonitoringResultResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('status_code')
                     ->badge()
-                    ->color(fn (?int $state): string => match (true) {
+                    ->color(fn(?int $state): string => match (true) {
                         $state >= 200 && $state < 300 => 'success',
                         $state >= 300 && $state < 400 => 'warning',
                         $state >= 400 => 'danger',
@@ -65,9 +65,9 @@ class MonitoringResultResource extends Resource
                     ->numeric()
                     ->sortable()
                     ->suffix(' ms')
-                    ->color(fn (?int $state): string => match (true) {
+                    ->color(fn(?int $state): string => match (true) {
                         $state < 1000 => 'success',
-                        $state < 3000 => 'warning', 
+                        $state < 3000 => 'warning',
                         $state >= 3000 => 'danger',
                         default => 'gray',
                     }),
@@ -106,11 +106,14 @@ class MonitoringResultResource extends Resource
                         'warning' => 'Warning',
                     ]),
                 Tables\Filters\Filter::make('content_changed')
-                    ->query(fn (Builder $query): Builder => $query->where('content_changed', true))
+                    ->query(fn(Builder $query): Builder => $query->where('content_changed', true))
                     ->label('Content Changed'),
                 Tables\Filters\Filter::make('has_screenshot')
-                    ->query(fn (Builder $query): Builder => $query->whereNotNull('screenshot_path'))
+                    ->query(fn(Builder $query): Builder => $query->whereNotNull('screenshot_path'))
                     ->label('Has Screenshot'),
+                Tables\Filters\Filter::make('no_screenshot')
+                    ->query(fn(Builder $query): Builder => $query->whereNull('screenshot_path'))
+                    ->label('No Screenshot'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -119,7 +122,8 @@ class MonitoringResultResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array

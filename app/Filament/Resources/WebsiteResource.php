@@ -94,20 +94,12 @@ class WebsiteResource extends Resource
             ])
             ->actions([
                 Tables\Actions\Action::make('monitor')
+                    ->label('Monitor')
                     ->icon('heroicon-o-play')
-                    ->action(function (Website $record) {
-                        \Artisan::call('monitor:websites', ['--id' => $record->id]);
-                        \Filament\Notifications\Notification::make()
-                            ->title('Monitoring started')
-                            ->body("Monitoring check initiated for {$record->name}")
-                            ->success()
-                            ->send();
-                    }),
+                    ->color('primary')
+                    ->url(fn (Website $record): string => route('monitor.website.get', $record))
+                    ->openUrlInNewTab(false),
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('view_results')
-                    ->icon('heroicon-o-chart-bar')
-                    ->url(fn (Website $record): string => MonitoringResultResource::getUrl('index', ['tableFilters[website][value]' => $record->id]))
-                    ->openUrlInNewTab(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

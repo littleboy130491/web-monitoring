@@ -16,4 +16,9 @@ class ListWebsites extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    public function getHeader(): ?\Illuminate\Contracts\View\View
+    {
+        return view('filament.custom.website-header');
+    }
 }

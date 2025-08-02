@@ -149,17 +149,11 @@ class ViewMonitoringResult extends ViewRecord
     {
         return [
             Actions\Action::make('recheck')
+                ->label('Recheck')
                 ->icon('heroicon-o-arrow-path')
-                ->action(function ($record) {
-                    \Artisan::call('monitor:websites', ['--id' => $record->website_id]);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Monitoring check initiated')
-                        ->body("New check started for {$record->website->name}")
-                        ->success()
-                        ->send();
-
-                    return redirect()->route('filament.admin.resources.monitoring-results.index');
-                }),
+                ->color('primary')
+                ->url(fn ($record): string => route('monitor.website.get', $record->website))
+                ->openUrlInNewTab(false),
         ];
     }
 }
