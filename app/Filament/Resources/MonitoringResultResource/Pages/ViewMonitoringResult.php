@@ -152,8 +152,36 @@ class ViewMonitoringResult extends ViewRecord
                 ->label('Recheck')
                 ->icon('heroicon-o-arrow-path')
                 ->color('primary')
-                ->url(fn ($record): string => route('monitor.website.get', $record->website))
-                ->openUrlInNewTab(false),
+                ->action(function ($record) {
+                    \App\Jobs\MonitorWebsiteJob::dispatch($record->website, false, 30);
+                    
+                    \Filament\Notifications\Notification::make()
+                        ->title('Monitoring Queued')
+                        ->body("Website '{$record->website->name}' has been queued for monitoring")
+                        ->success()
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->modalHeading('Recheck Website')
+                ->modalDescription(fn ($record) => "Queue monitoring for '{$record->website->name}'?")
+                ->modalSubmitActionLabel('Yes, Recheck'),
+            Actions\Action::make('recheck_with_screenshot')
+                ->label('Recheck + Screenshot')
+                ->icon('heroicon-o-camera')
+                ->color('warning')
+                ->action(function ($record) {
+                    \App\Jobs\MonitorWebsiteJob::dispatch($record->website, true, 30);
+                    
+                    \Filament\Notifications\Notification::make()
+                        ->title('Monitoring with Screenshot Queued')
+                        ->body("Website '{$record->website->name}' has been queued for monitoring with screenshot")
+                        ->success()
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->modalHeading('Recheck Website with Screenshot')
+                ->modalDescription(fn ($record) => "Queue monitoring with screenshot for '{$record->website->name}'? This may take longer.")
+                ->modalSubmitActionLabel('Yes, Recheck with Screenshot'),
         ];
     }
 }

@@ -34,11 +34,10 @@ class WebsiteResource extends Resource
                 Forms\Components\Textarea::make('description')
                     ->columnSpanFull(),
                 Forms\Components\Toggle::make('is_active')
-                    ->required(),
+                    ->default(true),
                 Forms\Components\TextInput::make('check_interval')
-                    ->required()
                     ->numeric()
-                    ->default(300)
+                    ->default(3600)
                     ->suffix('seconds')
                     ->helperText('How often to check this website (in seconds)'),
                 Forms\Components\KeyValue::make('headers')
@@ -72,13 +71,15 @@ class WebsiteResource extends Resource
                     ->suffix(' sec'),
                 Tables\Columns\TextColumn::make('latestResult.status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn (?string $state): string => match ($state) {
                         'up' => 'success',
                         'down' => 'danger', 
                         'error' => 'danger',
                         'warning' => 'warning',
+                        null => 'gray',
                         default => 'gray',
                     })
+                    ->default('No data')
                     ->label('Status'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -96,9 +97,37 @@ class WebsiteResource extends Resource
                 Tables\Actions\Action::make('monitor')
                     ->label('Monitor')
                     ->icon('heroicon-o-play')
-                    ->color('primary')
-                    ->url(fn (Website $record): string => route('monitor.website.get', $record))
-                    ->openUrlInNewTab(false),
+                    ->color('success')
+                    ->action(function (Website $record) {
+                        \App\Jobs\MonitorWebsiteJob::dispatch($record, false, 30);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Monitoring Queued')
+                            ->body("Website '{$record->name}' has been queued for monitoring")
+                            ->success()
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Monitor Website')
+                    ->modalDescription(fn (Website $record) => "Queue monitoring for '{$record->name}'?")
+                    ->modalSubmitActionLabel('Yes, Monitor'),
+                Tables\Actions\Action::make('monitor_with_screenshot')
+                    ->label('Monitor + Screenshot')
+                    ->icon('heroicon-o-camera')
+                    ->color('warning')
+                    ->action(function (Website $record) {
+                        \App\Jobs\MonitorWebsiteJob::dispatch($record, true, 30);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Monitoring with Screenshot Queued')
+                            ->body("Website '{$record->name}' has been queued for monitoring with screenshot")
+                            ->success()
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Monitor Website with Screenshot')
+                    ->modalDescription(fn (Website $record) => "Queue monitoring with screenshot for '{$record->name}'? This may take longer.")
+                    ->modalSubmitActionLabel('Yes, Monitor with Screenshot'),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
