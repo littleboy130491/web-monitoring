@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\WebsiteResource\Pages;
 
+use App\Filament\Imports\WebsiteImporter;
 use App\Filament\Resources\WebsiteResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
@@ -14,6 +15,11 @@ class ListWebsites extends ListRecords
     {
         return [
             Actions\CreateAction::make(),
+            Actions\ImportAction::make()
+                ->importer(WebsiteImporter::class)
+                ->label('Import Websites')
+                ->icon('heroicon-o-document-arrow-up')
+                ->color('info'),
             Actions\Action::make('monitor_all')
                 ->label('Monitor All')
                 ->icon('heroicon-o-play')

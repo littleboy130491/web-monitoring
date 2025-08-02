@@ -33,7 +33,7 @@
     <!-- Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:bg-gray-50 transition-colors {{ $statusFilter === 'online' ? 'ring-2 ring-green-500' : '' }}"
-             wire:click="setStatusFilter('online')">
+            wire:click="setStatusFilter('online')">
             <div class="flex items-center">
                 <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                 <span class="text-sm text-gray-600">Online</span>
@@ -41,7 +41,7 @@
             <div class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['upCount'] }}</div>
         </div>
         <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:bg-gray-50 transition-colors {{ $statusFilter === 'offline' ? 'ring-2 ring-red-500' : '' }}"
-             wire:click="setStatusFilter('offline')">
+            wire:click="setStatusFilter('offline')">
             <div class="flex items-center">
                 <div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
                 <span class="text-sm text-gray-600">Offline</span>
@@ -49,7 +49,7 @@
             <div class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['downCount'] }}</div>
         </div>
         <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:bg-gray-50 transition-colors {{ $statusFilter === 'all' ? 'ring-2 ring-gray-500' : '' }}"
-             wire:click="setStatusFilter('all')">
+            wire:click="setStatusFilter('all')">
             <div class="flex items-center">
                 <div class="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
                 <span class="text-sm text-gray-600">Total</span>
@@ -65,17 +65,17 @@
                 <span class="text-sm font-medium text-gray-700">Filter:</span>
                 <div class="flex space-x-2">
                     <button wire:click="setStatusFilter('all')"
-                            class="px-3 py-1 text-sm rounded-full transition-colors
+                        class="px-3 py-1 text-sm rounded-full transition-colors
                                    {{ $statusFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}">
                         All ({{ $stats['totalWebsites'] }})
                     </button>
                     <button wire:click="setStatusFilter('online')"
-                            class="px-3 py-1 text-sm rounded-full transition-colors
+                        class="px-3 py-1 text-sm rounded-full transition-colors
                                    {{ $statusFilter === 'online' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200' }}">
                         Online ({{ $stats['upCount'] }})
                     </button>
                     <button wire:click="setStatusFilter('offline')"
-                            class="px-3 py-1 text-sm rounded-full transition-colors
+                        class="px-3 py-1 text-sm rounded-full transition-colors
                                    {{ $statusFilter === 'offline' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200' }}">
                         Offline ({{ $stats['downCount'] }})
                     </button>
@@ -83,11 +83,8 @@
             </div>
             <div class="flex items-center space-x-2">
                 <label for="search" class="text-sm font-medium text-gray-700">Search:</label>
-                <input type="text" 
-                       id="search"
-                       wire:model.live.debounce.300ms="search" 
-                       placeholder="Search services..."
-                       class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <input type="text" id="search" wire:model.live.debounce.300ms="search" placeholder="Search services..."
+                    class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
             </div>
         </div>
     </div>
@@ -126,7 +123,7 @@
                             @endif
                         </div>
                         <div>
-                            <h3 class="font-medium text-gray-900">{{ $website->name }}</h3>
+                            <h3 class="font-medium text-gray-900">{{ $website->url }}</h3>
                             @if($website->description)
                                 <p class="text-sm text-gray-500">{{ $website->description }}</p>
                             @endif
@@ -142,10 +139,10 @@
                                     </span>
                                 @endif
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    @if($website->latestResult->status === 'up') bg-green-100 text-green-800
-                                    @elseif($website->latestResult->status === 'down') bg-red-100 text-red-800
-                                    @elseif($website->latestResult->status === 'error') bg-red-100 text-red-800
-                                    @else bg-yellow-100 text-yellow-800 @endif">
+                                            @if($website->latestResult->status === 'up') bg-green-100 text-green-800
+                                            @elseif($website->latestResult->status === 'down') bg-red-100 text-red-800
+                                            @elseif($website->latestResult->status === 'error') bg-red-100 text-red-800
+                                            @else bg-yellow-100 text-yellow-800 @endif">
                                     {{ ucfirst($website->latestResult->status) }}
                                 </span>
                             </div>
@@ -153,7 +150,8 @@
                                 Last checked {{ $website->latestResult->checked_at->diffForHumans() }}
                             </div>
                         @else
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <span
+                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                 Unknown
                             </span>
                         @endif
@@ -163,8 +161,8 @@
                 <div class="px-6 py-8 text-center text-gray-500">
                     @if($statusFilter !== 'all' || !empty($search))
                         No services found matching your criteria.
-                        <button wire:click="$set('statusFilter', 'all'); $set('search', '')" 
-                                class="text-blue-600 hover:text-blue-500 ml-1">
+                        <button wire:click="$set('statusFilter', 'all'); $set('search', '')"
+                            class="text-blue-600 hover:text-blue-500 ml-1">
                             Clear filters
                         </button>
                     @else

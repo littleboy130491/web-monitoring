@@ -48,9 +48,8 @@ class StatusPage extends Component
         // Apply search filter
         if (!empty($this->search)) {
             $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('url', 'like', '%' . $this->search . '%')
-                  ->orWhere('description', 'like', '%' . $this->search . '%');
+                $q->Where('url', 'like', '%' . $this->search . '%')
+                    ->orWhere('description', 'like', '%' . $this->search . '%');
             });
         }
 
@@ -67,13 +66,13 @@ class StatusPage extends Component
             });
         }
 
-        return $query->orderBy('name')->paginate(10);
+        return $query->orderBy('url')->paginate(10);
     }
 
     public function getStatsProperty()
     {
         $websites = Website::with('latestResult')->where('is_active', true)->get();
-        
+
         $upCount = $websites->filter(function ($website) {
             return $website->latestResult && $website->latestResult->status === 'up';
         })->count();

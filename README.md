@@ -1,61 +1,240 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Web Monitor
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A comprehensive Laravel 12.x web monitoring application that tracks website status, performance, SSL certificates, and content changes. Features a professional Filament PHP admin panel and public status page with automated screenshot capture.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 🌐 Website Monitoring
+- **Status Monitoring**: HTTP status codes (up/down/error/warning)
+- **Performance Tracking**: Response time measurement
+- **SSL Certificates**: Expiration monitoring and validation
+- **Content Changes**: SHA256 hash-based change detection
+- **Screenshot Capture**: Full-page visual monitoring with Puppeteer
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 🎛️ Admin Panel (Filament PHP)
+- **Professional Interface**: Modern admin panel at `/admin`
+- **Website Management**: Full CRUD operations with validation
+- **Queue-Based Monitoring**: Background job processing for better performance
+- **CSV Import**: Professional import functionality with intelligent defaults
+- **Real-time Notifications**: Database notifications for monitoring events
+- **Dashboard Widgets**: Statistics and trend charts
+- **Mobile Responsive**: Optimized for all devices
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 📊 Public Status Page
+- **Clean Interface**: Professional status display at `/` or `/status`
+- **Real-time Updates**: Auto-refresh every 30 seconds
+- **System Health**: Overall status indicators
+- **Response Times**: Latest check information
+- **Mobile Friendly**: Responsive design
 
-## Learning Laravel
+### 🔄 Automation
+- **Background Jobs**: Queue-based monitoring system
+- **Scheduled Tasks**: Automatic monitoring twice daily
+- **Data Pruning**: Automated cleanup of old monitoring data
+- **Docker Ready**: Full Laravel Sail integration
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Installation
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### Requirements
+- PHP ^8.2
+- Laravel 12.x
+- Node.js & npm
+- SQLite/MySQL/PostgreSQL
+- Google Chrome/Chromium (for screenshots)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Quick Start with Laravel Sail (Recommended)
 
-## Laravel Sponsors
+1. **Clone and Setup**
+   ```bash
+   git clone <repository-url>
+   cd web-monitor
+   cp .env.example .env
+   ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+2. **Install Dependencies**
+   ```bash
+   composer install
+   npm install
+   ```
 
-### Premium Partners
+3. **Start with Laravel Sail**
+   ```bash
+   ./vendor/bin/sail up -d
+   ./vendor/bin/sail artisan key:generate
+   ./vendor/bin/sail artisan migrate
+   ```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+4. **Install Chrome for Screenshots**
+   ```bash
+   ./vendor/bin/sail exec laravel.test apt update
+   ./vendor/bin/sail exec laravel.test apt install -y google-chrome-stable
+   ```
+
+5. **Create Admin User**
+   ```bash
+    ./vendor/bin/sail artisan make:filament-user
+   ```
+   
+6. **Start Development Environment**
+   ```bash
+    ./vendor/bin/sail composer run dev
+   ```
+
+### Traditional Installation
+
+1. **Clone and Setup**
+   ```bash
+   git clone <repository-url>
+   cd web-monitor
+   cp .env.example .env
+   composer install
+   npm install
+   ```
+
+2. **Database Setup**
+   ```bash
+   php artisan key:generate
+   php artisan migrate
+   ```
+
+3. **Start Development**
+   ```bash
+   composer run dev
+   ```
+
+## Usage
+
+### Admin Panel
+1. **Access**: Navigate to `/admin`
+2. **Login**: Use your created admin credentials
+3. **Add Websites**: Click "Create" or use "Import Websites" for bulk upload
+4. **Monitor**: Use individual or bulk monitoring buttons
+5. **View Results**: Check monitoring results and screenshots
+
+### CSV Import Format
+```csv
+url,description,is_active,check_interval,headers
+https://example.com,My website,true,3600,
+https://google.com,,,1,7200,"{""User-Agent"":""Custom-Bot""}"
+```
+- **Required**: Only `url` field is mandatory
+- **Optional**: All other fields have intelligent defaults
+
+### Command Line Usage
+
+**Monitor Websites**
+```bash
+# Monitor all active websites
+php artisan monitor:websites
+
+# Monitor specific website
+php artisan monitor:websites --id=1
+
+# Monitor with screenshots
+php artisan monitor:websites --screenshot
+
+# Custom timeout
+php artisan monitor:websites --timeout=60
+```
+
+**Data Management**
+```bash
+# Prune old data (30 days default)
+php artisan monitor:prune
+
+# Custom retention period
+php artisan monitor:prune --days=7
+
+# Dry run to preview
+php artisan monitor:prune --dry-run
+```
+
+**Import Sample Data**
+```bash
+php artisan db:seed --class=WebsiteSeeder
+```
+
+### Queue Processing
+For background monitoring jobs:
+```bash
+# Development
+php artisan queue:work
+
+# Production (with Laravel Sail)
+./vendor/bin/sail artisan queue:work --daemon
+```
+
+### Scheduled Tasks
+The application automatically schedules:
+- **Website monitoring**: Twice daily at 12:00 AM and 12:00 PM
+- **Data pruning**: Once daily
+
+For production, add this cron job:
+```bash
+* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+## Configuration
+
+### Environment Variables
+```env
+# Queue system (recommended: database)
+QUEUE_CONNECTION=database
+
+# Database (SQLite default)
+DB_CONNECTION=sqlite
+DB_DATABASE=/absolute/path/to/database.sqlite
+
+# Screenshot settings
+BROWSERSHOT_CHROME_PATH=/usr/bin/google-chrome
+```
+
+### Admin Panel Access
+- **URL**: `/admin`
+- **Default Login**: Create via `php artisan tinker`
+- **Features**: Website management, monitoring, CSV import, notifications
+
+### Public Status Page
+- **URL**: `/` or `/status`
+- **Features**: Real-time status, auto-refresh, mobile responsive
+
+## Architecture
+
+- **Backend**: Laravel 12.x with PHP ^8.2
+- **Admin Panel**: Filament PHP v3.x
+- **Database**: SQLite (default), MySQL/PostgreSQL supported
+- **Queue System**: Database-backed for reliability
+- **Frontend**: Vite + TailwindCSS v4
+- **Screenshots**: Spatie Browsershot + Puppeteer
+- **Containerization**: Laravel Sail (Docker)
+
+## Key Directories
+
+```
+app/
+├── Console/Commands/     # Artisan commands
+├── Filament/            # Admin panel resources
+├── Jobs/                # Queue jobs
+└── Models/              # Eloquent models
+
+resources/views/         # Blade templates
+storage/app/public/screenshots/  # Screenshot storage
+routes/console.php       # Scheduled tasks
+```
+
+## Screenshots
+
+The application captures full-page screenshots (1920x1080) with network idle detection. Screenshots are stored in `storage/app/public/screenshots/` and accessible through the admin panel.
+
 
 ## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open-sourced software licensed under the [MIT license](LICENSE).
