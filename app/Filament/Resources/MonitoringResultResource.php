@@ -56,7 +56,7 @@ class MonitoringResultResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('website.name')
+                Tables\Columns\TextColumn::make('website.url')
                     ->sortable()
                     ->searchable()
                     ->label('Website'),
@@ -98,7 +98,7 @@ class MonitoringResultResource extends Resource
                     ->height(50)
                     ->width(70)
                     ->label('Screenshot')
-                    ->visibility('private'),
+                    ->visibility('public'),
                 Tables\Columns\TextColumn::make('checked_at')
                     ->dateTime()
                     ->sortable()
@@ -114,7 +114,7 @@ class MonitoringResultResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('website')
-                    ->relationship('website', 'name')
+                    ->relationship('website', 'url')
                     ->searchable()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('status')

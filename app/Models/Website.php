@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Website extends Model
 {
     protected $fillable = [
-        'name',
         'url',
         'description',
         'is_active',

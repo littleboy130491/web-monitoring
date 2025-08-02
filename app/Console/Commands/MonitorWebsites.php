@@ -91,14 +91,14 @@ class MonitorWebsites extends Command
 
             $response = $this->client->get($website->url, $options);
             $endTime = microtime(true);
-            
+
             $result['response_time'] = (int) (($endTime - $startTime) * 1000);
             $result['status_code'] = $response->getStatusCode();
             $result['headers'] = json_encode($response->getHeaders());
-            
+
             $content = $response->getBody()->getContents();
             $result['content_hash'] = hash('sha256', $content);
-            
+
             // Check if content changed
             $lastResult = $website->monitoringResults()->latest()->first();
             if ($lastResult && $lastResult->content_hash !== $result['content_hash']) {
@@ -163,7 +163,7 @@ class MonitorWebsites extends Command
             if ($client) {
                 $cert = stream_context_get_params($client)['options']['ssl']['peer_certificate'];
                 $certInfo = openssl_x509_parse($cert);
-                
+
                 return [
                     'issuer' => $certInfo['issuer']['CN'] ?? 'Unknown',
                     'subject' => $certInfo['subject']['CN'] ?? 'Unknown',
@@ -184,7 +184,7 @@ class MonitorWebsites extends Command
         try {
             $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.png';
             $fullPath = storage_path('app/public/' . $filename);
-            
+
             // Ensure screenshots directory exists
             $dir = dirname($fullPath);
             if (!is_dir($dir)) {
@@ -218,7 +218,7 @@ class MonitorWebsites extends Command
 
     private function displayResult(Website $website, array $result): void
     {
-        $status = match($result['status']) {
+        $status = match ($result['status']) {
             'up' => '<fg=green>UP</fg=green>',
             'down' => '<fg=red>DOWN</fg=red>',
             'error' => '<fg=red>ERROR</fg=red>',
@@ -229,19 +229,19 @@ class MonitorWebsites extends Command
         $this->newLine();
         $this->line("🌐 {$website->name} ({$website->url})");
         $this->line("   Status: {$status}");
-        
+
         if ($result['status_code']) {
             $this->line("   HTTP: {$result['status_code']}");
         }
-        
+
         if ($result['response_time']) {
             $this->line("   Response Time: {$result['response_time']}ms");
         }
-        
+
         if ($result['content_changed']) {
             $this->line("   <fg=blue>Content Changed!</fg=blue>");
         }
-        
+
         if ($result['error_message']) {
             $this->line("   Error: {$result['error_message']}");
         }
@@ -252,7 +252,7 @@ class MonitorWebsites extends Command
         }
 
         if ($result['screenshot_path']) {
-            $this->line("   📸 Screenshot: storage/app/public/{$result['screenshot_path']}");
+            $this->line("   📸 Screenshot: {$result['screenshot_path']}");
         }
     }
 }

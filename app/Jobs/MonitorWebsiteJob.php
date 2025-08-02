@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\Website;
 use App\Models\MonitoringResult;
+use App\Models\User;
+use Filament\Notifications\Notification;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,7 +37,7 @@ class MonitorWebsiteJob implements ShouldQueue
     {
         $client = new Client();
         $startTime = microtime(true);
-        
+
         $result = [
             'website_id' => $this->website->id,
             'checked_at' => now(),
@@ -60,14 +62,14 @@ class MonitorWebsiteJob implements ShouldQueue
 
             $response = $client->get($this->website->url, $options);
             $endTime = microtime(true);
-            
+
             $result['response_time'] = (int) (($endTime - $startTime) * 1000);
             $result['status_code'] = $response->getStatusCode();
             $result['headers'] = json_encode($response->getHeaders());
-            
+
             $content = $response->getBody()->getContents();
             $result['content_hash'] = hash('sha256', $content);
-            
+
             // Check if content changed
             $lastResult = $this->website->monitoringResults()->latest()->first();
             if ($lastResult && $lastResult->content_hash !== $result['content_hash']) {
@@ -107,7 +109,48 @@ class MonitorWebsiteJob implements ShouldQueue
             $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
         }
 
-        MonitoringResult::create($result);
+        $monitoringResult = MonitoringResult::create($result);
+
+        // Send notifications to all users
+        $users = User::all();
+
+        foreach ($users as $user) {
+            $title = match ($result['status']) {
+                'up' => "✅ {$this->website->name} is Online",
+                'down' => "❌ {$this->website->name} is Down",
+                'error' => "⚠️ Failed to Monitor {$this->website->name}",
+                'warning' => "⚠️ {$this->website->name} has Issues",
+                default => "📊 Monitoring Complete for {$this->website->name}",
+            };
+
+            $body = "Status: {$result['status']}";
+            if ($result['response_time']) {
+                $body .= " | Response: {$result['response_time']}ms";
+            }
+            if ($result['error_message']) {
+                $body .= " | Error: {$result['error_message']}";
+            }
+            if ($result['content_changed']) {
+                $body .= " | Content changed!";
+            }
+
+            $color = match ($result['status']) {
+                'up' => 'success',
+                'down' => 'danger',
+                'error' => 'danger',
+                'warning' => 'warning',
+                default => 'info',
+            };
+
+            $user->notify(
+                Notification::make()
+                    ->title($title)
+                    ->body($body)
+                    ->color($color)
+                    ->toDatabase()
+            );
+        }
+
     }
 
     private function getSSLInfo(string $url): ?array
@@ -136,7 +179,7 @@ class MonitorWebsiteJob implements ShouldQueue
             if ($client) {
                 $cert = stream_context_get_params($client)['options']['ssl']['peer_certificate'];
                 $certInfo = openssl_x509_parse($cert);
-                
+
                 return [
                     'issuer' => $certInfo['issuer']['CN'] ?? 'Unknown',
                     'subject' => $certInfo['subject']['CN'] ?? 'Unknown',
@@ -157,7 +200,7 @@ class MonitorWebsiteJob implements ShouldQueue
         try {
             $filename = 'screenshots/' . $this->website->id . '_' . now()->format('Y-m-d_H-i-s') . '.png';
             $fullPath = storage_path('app/public/' . $filename);
-            
+
             // Ensure screenshots directory exists
             $dir = dirname($fullPath);
             if (!is_dir($dir)) {
@@ -173,21 +216,31 @@ class MonitorWebsiteJob implements ShouldQueue
 
             \Log::info("Taking screenshot for {$this->website->name} using Chrome at: {$chromePath}");
 
-            Browsershot::url($this->website->url)
+            // Create Browsershot instance with improved configuration
+            $browsershot = Browsershot::url($this->website->url)
                 ->setChromePath($chromePath)
                 ->noSandbox()
                 ->dismissDialogs()
                 ->windowSize(1920, 1080)
-                ->userAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-                ->waitUntilNetworkIdle(false)
-                ->timeout(30)
-                ->setOption('headless', true)
-                ->setOption('no-first-run', true)
-                ->setOption('disable-gpu', true)
-                ->setOption('disable-dev-shm-usage', true)
-                ->setOption('disable-extensions', true)
-                ->setOption('disable-web-security', true)
-                ->save($fullPath);
+                ->userAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+                ->waitUntilNetworkIdle(true) // Changed to true for better page loading
+                ->timeout(60) // Increased timeout
+                ->setOption('args', [
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins',
+                    '--disable-features=site-per-process',
+                    '--no-first-run',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--disable-extensions',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding'
+                ])
+                ->setOption('headless', 'new'); // Use new headless mode
+
+            // Take the screenshot
+            $browsershot->save($fullPath);
 
             // Verify the file was created and has content
             if (file_exists($fullPath) && filesize($fullPath) > 0) {
@@ -195,26 +248,50 @@ class MonitorWebsiteJob implements ShouldQueue
                 return $filename;
             } else {
                 \Log::error("Screenshot file was created but is empty: {$filename}");
+                // Try to get more information about what went wrong
+                if (file_exists($fullPath)) {
+                    \Log::error("File exists but is empty. Size: " . filesize($fullPath) . " bytes");
+                } else {
+                    \Log::error("File was not created at all");
+                }
                 return null;
             }
 
         } catch (\Exception $e) {
             \Log::error("Screenshot failed for {$this->website->name}: " . $e->getMessage());
             \Log::error("Screenshot stack trace: " . $e->getTraceAsString());
+            // Log additional debugging information
+            \Log::error("Website URL: {$this->website->url}");
+            \Log::error("Full path: {$fullPath}");
             return null;
         }
     }
 
     private function getChromePath(): ?string
     {
+        // Check if we're in a Docker/Sail environment
+        $isSail = env('LARAVEL_SAIL', false);
+
+        if ($isSail) {
+            // In Sail environment, Chromium is typically at this path
+            $sailChromePath = '/usr/bin/chromium-browser';
+            if (file_exists($sailChromePath) && is_executable($sailChromePath)) {
+                \Log::info("Found Chrome in Sail environment: {$sailChromePath}");
+                return $sailChromePath;
+            }
+        }
+
         // Common Chrome/Chromium paths to check
         $paths = [
             '/usr/bin/google-chrome',
-            '/usr/bin/google-chrome-stable', 
+            '/usr/bin/google-chrome-stable',
             '/usr/bin/chromium',
             '/usr/bin/chromium-browser',
             '/snap/bin/chromium',
             '/opt/google/chrome/chrome',
+            '/usr/bin/chrome',
+            '/usr/local/bin/chrome',
+            '/usr/local/bin/google-chrome'
         ];
 
         foreach ($paths as $path) {
@@ -231,14 +308,26 @@ class MonitorWebsiteJob implements ShouldQueue
                 \Log::info("Found Chrome via which: " . trim($result));
                 return trim($result);
             }
-            
+
             $result = shell_exec('which chromium 2>/dev/null');
             if ($result && trim($result)) {
                 \Log::info("Found Chromium via which: " . trim($result));
                 return trim($result);
             }
+
+            $result = shell_exec('which chrome 2>/dev/null');
+            if ($result && trim($result)) {
+                \Log::info("Found Chrome via which: " . trim($result));
+                return trim($result);
+            }
         } catch (\Exception $e) {
             \Log::error("Error finding Chrome: " . $e->getMessage());
+        }
+
+        // Check if we're in a Docker/Sail environment and use the appropriate path
+        if (file_exists('/usr/bin/chromium-browser') && is_executable('/usr/bin/chromium-browser')) {
+            \Log::info("Using Docker Chromium path: /usr/bin/chromium-browser");
+            return '/usr/bin/chromium-browser';
         }
 
         \Log::error("No Chrome/Chromium found in any common locations");
