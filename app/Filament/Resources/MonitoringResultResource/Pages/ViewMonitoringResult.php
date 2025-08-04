@@ -157,7 +157,7 @@ class ViewMonitoringResult extends ViewRecord
                     
                     \Filament\Notifications\Notification::make()
                         ->title('Monitoring Queued')
-                        ->body("Website '{$record->website->name}' has been queued for monitoring")
+                        ->body("Website '{$record->website->url}' has been queued for monitoring")
                         ->success()
                         ->send();
                 })
@@ -174,7 +174,7 @@ class ViewMonitoringResult extends ViewRecord
                     
                     \Filament\Notifications\Notification::make()
                         ->title('Monitoring with Screenshot Queued')
-                        ->body("Website '{$record->website->name}' has been queued for monitoring with screenshot")
+                        ->body("Website '{$record->website->url}' has been queued for monitoring with screenshot")
                         ->success()
                         ->send();
                 })
