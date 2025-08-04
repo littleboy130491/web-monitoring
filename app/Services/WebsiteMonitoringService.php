@@ -221,10 +221,10 @@ class WebsiteMonitoringService
     private function findChromePath(): ?string
     {
         $possiblePaths = [
+            '/usr/bin/chromium',
             '/usr/bin/google-chrome',
             '/usr/bin/google-chrome-stable',
             '/usr/bin/chromium-browser',
-            '/usr/bin/chromium',
         ];
 
         foreach ($possiblePaths as $path) {
