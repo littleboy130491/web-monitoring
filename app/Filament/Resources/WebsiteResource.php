@@ -98,13 +98,13 @@ class WebsiteResource extends Resource
 
                         \Filament\Notifications\Notification::make()
                             ->title('Monitoring Queued')
-                            ->body("Website '{$record->name}' has been queued for monitoring")
+                            ->body("Website '{$record->url}' has been queued for monitoring")
                             ->success()
                             ->send();
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Monitor Website')
-                    ->modalDescription(fn(Website $record) => "Queue monitoring for '{$record->name}'?")
+                    ->modalDescription(fn(Website $record) => "Queue monitoring for '{$record->url}'?")
                     ->modalSubmitActionLabel('Yes, Monitor'),
                 Tables\Actions\Action::make('monitor_with_screenshot')
                     ->label('Monitor + Screenshot')
@@ -115,13 +115,13 @@ class WebsiteResource extends Resource
 
                         \Filament\Notifications\Notification::make()
                             ->title('Monitoring with Screenshot Queued')
-                            ->body("Website '{$record->name}' has been queued for monitoring with screenshot")
+                            ->body("Website '{$record->url}' has been queued for monitoring with screenshot")
                             ->success()
                             ->send();
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Monitor Website with Screenshot')
-                    ->modalDescription(fn(Website $record) => "Queue monitoring with screenshot for '{$record->name}'? This may take longer.")
+                    ->modalDescription(fn(Website $record) => "Queue monitoring with screenshot for '{$record->url}'? This may take longer.")
                     ->modalSubmitActionLabel('Yes, Monitor with Screenshot'),
                 Tables\Actions\EditAction::make(),
             ])

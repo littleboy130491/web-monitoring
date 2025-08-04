@@ -163,7 +163,7 @@ class ViewMonitoringResult extends ViewRecord
                 })
                 ->requiresConfirmation()
                 ->modalHeading('Recheck Website')
-                ->modalDescription(fn ($record) => "Queue monitoring for '{$record->website->name}'?")
+                ->modalDescription(fn ($record) => "Queue monitoring for '{$record->website->url}'?")
                 ->modalSubmitActionLabel('Yes, Recheck'),
             Actions\Action::make('recheck_with_screenshot')
                 ->label('Recheck + Screenshot')
@@ -180,7 +180,7 @@ class ViewMonitoringResult extends ViewRecord
                 })
                 ->requiresConfirmation()
                 ->modalHeading('Recheck Website with Screenshot')
-                ->modalDescription(fn ($record) => "Queue monitoring with screenshot for '{$record->website->name}'? This may take longer.")
+                ->modalDescription(fn ($record) => "Queue monitoring with screenshot for '{$record->website->url}'? This may take longer.")
                 ->modalSubmitActionLabel('Yes, Recheck with Screenshot'),
         ];
     }

@@ -193,7 +193,7 @@ class MonitorWebsites extends Command
 
             // Check if Chrome is available
             if (!file_exists('/usr/bin/google-chrome')) {
-                $this->warn("Chrome not found at /usr/bin/google-chrome - skipping screenshot for {$website->name}");
+                $this->warn("Chrome not found at /usr/bin/google-chrome - skipping screenshot for {$website->url}");
                 return null;
             }
 
@@ -211,7 +211,7 @@ class MonitorWebsites extends Command
 
             return $filename;
         } catch (\Exception $e) {
-            $this->warn("Screenshot failed for {$website->name}: " . $e->getMessage());
+            $this->warn("Screenshot failed for {$website->url}: " . $e->getMessage());
             return null;
         }
     }
@@ -227,7 +227,7 @@ class MonitorWebsites extends Command
         };
 
         $this->newLine();
-        $this->line("🌐 {$website->name} ({$website->url})");
+        $this->line("🌐 {$website->url}");
         $this->line("   Status: {$status}");
 
         if ($result['status_code']) {
