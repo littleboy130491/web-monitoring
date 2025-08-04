@@ -198,8 +198,8 @@ class WebsiteMonitoringService
                 ->setOption('disable-dev-shm-usage', true)
                 ->setOption('ignore-certificate-errors', true)
                 ->setOption('ignore-ssl-errors', true)
-                ->format('jpg')
-                ->quality(70)
+                ->setOption('type', 'jpeg')
+                ->setOption('quality', 70)
                 ->save($fullPath);
 
             // Verify the file was created and has content
