@@ -171,7 +171,7 @@ class WebsiteMonitoringService
     private function takeScreenshot(Website $website): ?string
     {
         try {
-            $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.png';
+            $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.jpg';
             $fullPath = storage_path('app/public/' . $filename);
 
             // Ensure screenshots directory exists
@@ -190,14 +190,16 @@ class WebsiteMonitoringService
                 ->setChromePath($chromePath)
                 ->noSandbox()
                 ->dismissDialogs()
-                ->windowSize(1920, 1080)
+                ->windowSize(1280, 720)
                 ->waitUntilNetworkIdle(false)
-                ->timeout(30)
+                ->timeout(20)
                 ->setOption('no-first-run', true)
                 ->setOption('disable-gpu', true)
                 ->setOption('disable-dev-shm-usage', true)
                 ->setOption('ignore-certificate-errors', true)
                 ->setOption('ignore-ssl-errors', true)
+                ->format('jpg')
+                ->quality(70)
                 ->save($fullPath);
 
             // Verify the file was created and has content
