@@ -196,6 +196,8 @@ class WebsiteMonitoringService
                 ->setOption('no-first-run', true)
                 ->setOption('disable-gpu', true)
                 ->setOption('disable-dev-shm-usage', true)
+                ->setOption('ignore-certificate-errors', true)
+                ->setOption('ignore-ssl-errors', true)
                 ->save($fullPath);
 
             // Verify the file was created and has content

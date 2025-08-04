@@ -18,8 +18,6 @@ class ViewMonitoringResult extends ViewRecord
             ->schema([
                 Components\Section::make('Website Information')
                     ->schema([
-                        Components\TextEntry::make('website.name')
-                            ->label('Website'),
                         Components\TextEntry::make('website.url')
                             ->label('URL')
                             ->url(fn($record) => $record->website->url)
