@@ -186,7 +186,7 @@ class WebsiteMonitoringService
                 return null;
             }
 
-            $screenshot = Browsershot::url($website->url)
+            Browsershot::url($website->url)
                 ->setChromePath($chromePath)
                 ->noSandbox()
                 ->dismissDialogs()
@@ -198,12 +198,8 @@ class WebsiteMonitoringService
                 ->setOption('disable-dev-shm-usage', true)
                 ->setOption('ignore-certificate-errors', true)
                 ->setOption('ignore-ssl-errors', true)
-                ->setScreenshotType('jpeg', quality: 70);
-
-            // Save JPEG with quality using PHP's imagejpeg
-            $image = imagecreatefromstring($screenshot);
-            imagejpeg($image, $fullPath, 70);
-            imagedestroy($image);
+                ->setScreenshotType('jpeg', quality: 70)
+                ->save($fullPath);
 
             // Verify the file was created and has content
             if (file_exists($fullPath) && filesize($fullPath) > 0) {
