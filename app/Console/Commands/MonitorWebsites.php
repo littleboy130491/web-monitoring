@@ -3,12 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Website;
-use App\Models\MonitoringResult;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
+use App\Services\WebsiteMonitoringService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
-use Spatie\Browsershot\Browsershot;
 
 class MonitorWebsites extends Command
 {
@@ -19,12 +15,12 @@ class MonitorWebsites extends Command
 
     protected $description = 'Monitor websites for status, health, content changes, and take screenshots';
 
-    private Client $client;
+    private WebsiteMonitoringService $monitoringService;
 
-    public function __construct()
+    public function __construct(WebsiteMonitoringService $monitoringService)
     {
         parent::__construct();
-        $this->client = new Client();
+        $this->monitoringService = $monitoringService;
     }
 
     public function handle(): int
@@ -44,7 +40,12 @@ class MonitorWebsites extends Command
         $bar->start();
 
         foreach ($websites as $website) {
-            $this->monitorWebsite($website);
+            $result = $this->monitoringService->monitor(
+                $website,
+                (int) $this->option('timeout'),
+                $this->option('screenshot')
+            );
+            $this->displayResult($website, $result->toArray());
             $bar->advance();
         }
 
@@ -64,157 +65,6 @@ class MonitorWebsites extends Command
         return Website::where('is_active', true)->get();
     }
 
-    private function monitorWebsite(Website $website): void
-    {
-        $startTime = microtime(true);
-        $result = [
-            'website_id' => $website->id,
-            'checked_at' => now(),
-            'status' => 'unknown',
-            'response_time' => null,
-            'status_code' => null,
-            'error_message' => null,
-            'headers' => null,
-            'ssl_info' => null,
-            'content_hash' => null,
-            'content_changed' => false,
-            'screenshot_path' => null,
-        ];
-
-        try {
-            $options = [
-                'timeout' => (int) $this->option('timeout'),
-                'headers' => $website->headers ?? [],
-                'verify' => true,
-                'http_errors' => false,
-            ];
-
-            $response = $this->client->get($website->url, $options);
-            $endTime = microtime(true);
-
-            $result['response_time'] = (int) (($endTime - $startTime) * 1000);
-            $result['status_code'] = $response->getStatusCode();
-            $result['headers'] = json_encode($response->getHeaders());
-
-            $content = $response->getBody()->getContents();
-            $result['content_hash'] = hash('sha256', $content);
-
-            // Check if content changed
-            $lastResult = $website->monitoringResults()->latest()->first();
-            if ($lastResult && $lastResult->content_hash !== $result['content_hash']) {
-                $result['content_changed'] = true;
-            }
-
-            // Determine status
-            if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
-                $result['status'] = 'up';
-            } elseif ($response->getStatusCode() >= 400) {
-                $result['status'] = 'down';
-                $result['error_message'] = "HTTP {$response->getStatusCode()} error";
-            } else {
-                $result['status'] = 'warning';
-            }
-
-            // SSL info for HTTPS
-            if (str_starts_with($website->url, 'https://')) {
-                $sslInfo = $this->getSSLInfo($website->url);
-                $result['ssl_info'] = $sslInfo ? json_encode($sslInfo) : null;
-            }
-
-            // Take screenshot if requested
-            if ($this->option('screenshot')) {
-                $result['screenshot_path'] = $this->takeScreenshot($website);
-            }
-
-        } catch (GuzzleException $e) {
-            $result['status'] = 'error';
-            $result['error_message'] = $e->getMessage();
-            $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
-        }
-
-        MonitoringResult::create($result);
-
-        $this->displayResult($website, $result);
-    }
-
-    private function getSSLInfo(string $url): ?array
-    {
-        try {
-            $parsedUrl = parse_url($url);
-            $host = $parsedUrl['host'];
-            $port = $parsedUrl['port'] ?? 443;
-
-            $context = stream_context_create([
-                'ssl' => [
-                    'capture_peer_cert' => true,
-                    'capture_peer_cert_chain' => true,
-                ],
-            ]);
-
-            $client = stream_socket_client(
-                "ssl://{$host}:{$port}",
-                $errno,
-                $errstr,
-                30,
-                STREAM_CLIENT_CONNECT,
-                $context
-            );
-
-            if ($client) {
-                $cert = stream_context_get_params($client)['options']['ssl']['peer_certificate'];
-                $certInfo = openssl_x509_parse($cert);
-
-                return [
-                    'issuer' => $certInfo['issuer']['CN'] ?? 'Unknown',
-                    'subject' => $certInfo['subject']['CN'] ?? 'Unknown',
-                    'valid_from' => date('Y-m-d H:i:s', $certInfo['validFrom_time_t']),
-                    'valid_to' => date('Y-m-d H:i:s', $certInfo['validTo_time_t']),
-                    'expires_in_days' => (int) (($certInfo['validTo_time_t'] - time()) / 86400),
-                ];
-            }
-        } catch (\Exception $e) {
-            // SSL info collection failed, continue without it
-        }
-
-        return null;
-    }
-
-    private function takeScreenshot(Website $website): ?string
-    {
-        try {
-            $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.png';
-            $fullPath = storage_path('app/public/' . $filename);
-
-            // Ensure screenshots directory exists
-            $dir = dirname($fullPath);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-
-            // Check if Chrome is available
-            if (!file_exists('/usr/bin/google-chrome')) {
-                $this->warn("Chrome not found at /usr/bin/google-chrome - skipping screenshot for {$website->url}");
-                return null;
-            }
-
-            Browsershot::url($website->url)
-                ->setChromePath('/usr/bin/google-chrome')
-                ->noSandbox()
-                ->dismissDialogs()
-                ->windowSize(1920, 1080)
-                ->waitUntilNetworkIdle(false)
-                ->timeout(30)
-                ->setOption('no-first-run', true)
-                ->setOption('disable-gpu', true)
-                ->setOption('disable-dev-shm-usage', true)
-                ->save($fullPath);
-
-            return $filename;
-        } catch (\Exception $e) {
-            $this->warn("Screenshot failed for {$website->url}: " . $e->getMessage());
-            return null;
-        }
-    }
 
     private function displayResult(Website $website, array $result): void
     {
