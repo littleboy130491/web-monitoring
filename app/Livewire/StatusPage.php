@@ -16,7 +16,6 @@ class StatusPage extends Component
     protected $queryString = [
         'statusFilter' => ['except' => 'all'],
         'search' => ['except' => ''],
-        'page' => ['except' => 1],
     ];
 
     public function mount()
