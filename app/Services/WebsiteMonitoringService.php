@@ -196,11 +196,6 @@ class WebsiteMonitoringService
                 ->setOption('no-first-run', true)
                 ->setOption('disable-gpu', true)
                 ->setOption('disable-dev-shm-usage', true)
-                ->setOption('disable-web-security', true)
-                ->setOption('disable-setuid-sandbox', true)
-                ->setOption('disable-extensions', true)
-                ->setOption('disable-plugins', true)
-                ->setOption('user-data-dir', '/tmp/chromium-' . uniqid())
                 ->save($fullPath);
 
             // Verify the file was created and has content
@@ -224,9 +219,9 @@ class WebsiteMonitoringService
     private function findChromePath(): ?string
     {
         $possiblePaths = [
-            '/usr/bin/chromium',
-            '/usr/bin/google-chrome',
             '/usr/bin/google-chrome-stable',
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium',
             '/usr/bin/chromium-browser',
         ];
 
