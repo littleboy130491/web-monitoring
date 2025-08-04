@@ -191,7 +191,7 @@ class MonitorWebsiteJob implements ShouldQueue
 
             if (!$chromePath) {
                 Log::error('No Chrome or Chromium installation found on system.');
-                return;
+                return null;
             }
 
             // Use Browsershot with Docker-compatible Chrome settings
