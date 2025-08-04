@@ -173,9 +173,30 @@ class MonitorWebsiteJob implements ShouldQueue
 
             \Log::info("Taking screenshot for {$this->website->url}");
 
+            $possiblePaths = [
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium',
+            ];
+
+            $chromePath = null;
+
+            foreach ($possiblePaths as $path) {
+                if (is_executable($path)) {
+                    $chromePath = $path;
+                    break;
+                }
+            }
+
+            if (!$chromePath) {
+                Log::error('No Chrome or Chromium installation found on system.');
+                return;
+            }
+
             // Use Browsershot with Docker-compatible Chrome settings
             Browsershot::url($this->website->url)
-                ->setChromePath('/usr/bin/google-chrome')
+                ->setChromePath($chromePath)
                 ->noSandbox()
                 ->setOption('disable-dev-shm-usage', true)
                 ->setOption('disable-gpu', true)
