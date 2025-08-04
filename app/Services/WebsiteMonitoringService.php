@@ -197,6 +197,9 @@ class WebsiteMonitoringService
                 ->setOption('disable-gpu', true)
                 ->setOption('disable-dev-shm-usage', true)
                 ->setOption('disable-web-security', true)
+                ->setOption('disable-setuid-sandbox', true)
+                ->setOption('disable-extensions', true)
+                ->setOption('disable-plugins', true)
                 ->setOption('user-data-dir', '/tmp/chromium-' . uniqid())
                 ->save($fullPath);
 
