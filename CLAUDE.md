@@ -120,13 +120,17 @@ Frontend assets are processed through Vite with TailwindCSS v4, providing modern
 
 Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome via queue jobs:
 - **Requirements**: Node.js, npm, Google Chrome, and Puppeteer (pre-installed in Laravel Sail)
+- **Browser compatibility**: Dynamic detection of Chrome/Chromium with fallback paths
 - **Docker compatibility**: Configured with `--no-sandbox`, `--disable-dev-shm-usage`, `--disable-gpu` flags
+- **SSL handling**: Bypasses certificate errors with `--ignore-certificate-errors` and `--ignore-ssl-errors`
 - **Smart capture**: Only takes screenshots when website status is "up" (saves resources)
 - **Storage**: Screenshots saved to `storage/app/public/screenshots/`
-- **Naming**: `{website_id}_{timestamp}.png` format
-- **Resolution**: 800x600 default screenshots
-- **Chrome path**: Uses system Chrome at `/usr/bin/google-chrome`
+- **Format**: JPEG format with 70% quality for optimized file sizes
+- **Naming**: `{website_id}_{timestamp}.jpg` format
+- **Resolution**: 1280x720 optimized screenshots (reduced from 1920x1080)
+- **Chrome path**: Dynamic detection with priority: `/usr/bin/google-chrome-stable`, `/usr/bin/google-chrome`, `/usr/bin/chromium`, `/usr/bin/chromium-browser`
 - **Queue-based**: Background processing prevents UI blocking
+- **Performance**: 20-second timeout for faster processing
 
 ## Queue System & Notifications
 
@@ -160,9 +164,11 @@ Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome via queue j
   - Real-time Filament notifications for monitoring events
   - Database notifications for status changes, errors, content changes, and screenshots
   - Read-only monitoring results with detailed info lists
-  - Advanced filtering and search capabilities
+  - Advanced filtering and search capabilities including "Last 24 Hours" filter
+  - **Data management**: User-friendly pruning interface with screenshot cleanup
+  - **Prune old data**: Admin action to delete monitoring results and screenshots (0-365 days, 0=all)
   - Dashboard with overview statistics and trend charts
-  - Screenshot integration and viewing (Docker-compatible)
+  - Screenshot integration and viewing (Docker-compatible, JPEG optimized)
   - Copy functionality for debugging data
   - Color-coded status indicators throughout
   - Mobile-responsive admin interface

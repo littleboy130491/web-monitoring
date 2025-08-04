@@ -40,67 +40,94 @@ A comprehensive Laravel 12.x web monitoring application that tracks website stat
 - Laravel 12.x
 - Node.js & npm
 - SQLite/MySQL/PostgreSQL
-- Google Chrome/Chromium (for screenshots)
+- Google Chrome (for screenshots)
 
-### Quick Start with Laravel Sail (Recommended)
+### Installation Steps
 
-1. **Clone and Setup**
+1. **Clone Repository**
    ```bash
-   git clone <repository-url>
-   cd web-monitor
+   git clone https://github.com/littleboy130491/web-monitoring.git
+   cd web-monitoring
+   ```
+
+2. **Environment Setup**
+   ```bash
    cp .env.example .env
    ```
 
-2. **Install Dependencies**
+3. **Install Dependencies**
    ```bash
    composer install
    npm install
    ```
 
-3. **Start with Laravel Sail**
+4. **Install Google Chrome**
    ```bash
-   ./vendor/bin/sail up -d
-   ./vendor/bin/sail artisan key:generate
-   ./vendor/bin/sail artisan migrate
+   # Ubuntu/Debian
+   wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+   echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+   sudo apt update
+   sudo apt install google-chrome-stable
    ```
 
-4. **Install Chrome for Screenshots**
-   ```bash
-   ./vendor/bin/sail exec laravel.test apt update
-   ./vendor/bin/sail exec laravel.test apt install -y google-chrome-stable
-   ```
-
-5. **Create Admin User**
-   ```bash
-    ./vendor/bin/sail artisan make:filament-user
-   ```
-   
-6. **Start Development Environment**
-   ```bash
-    ./vendor/bin/sail composer run dev
-   ```
-
-### Traditional Installation
-
-1. **Clone and Setup**
-   ```bash
-   git clone <repository-url>
-   cd web-monitor
-   cp .env.example .env
-   composer install
-   npm install
-   ```
-
-2. **Database Setup**
+5. **Generate Application Key**
    ```bash
    php artisan key:generate
+   ```
+
+6. **Create Storage Link**
+   ```bash
+   php artisan storage:link
+   ```
+
+7. **Run Migrations**
+   ```bash
    php artisan migrate
    ```
 
-3. **Start Development**
+8. **Build Assets**
    ```bash
-   composer run dev
+   # Development
+   npm run dev
+   
+   # Production
+   npm run build
    ```
+
+### Production Setup
+
+9. **Create Admin User**
+   ```bash
+   php artisan make:filament-user
+   ```
+
+10. **Setup Cron Job**
+    ```bash
+    # Add to crontab (crontab -e)
+    * * * * * cd /path/to/web-monitoring && php artisan schedule:run >> /dev/null 2>&1
+    ```
+
+11. **Setup Queue Worker (Supervisor)**
+    ```bash
+    # Create supervisor config: /etc/supervisor/conf.d/web-monitor-worker.conf
+    [program:web-monitor-worker]
+    process_name=%(program_name)s_%(process_num)02d
+    command=php /path/to/web-monitoring/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    autostart=true
+    autorestart=true
+    stopasgroup=true
+    killasgroup=true
+    user=www-data
+    numprocs=2
+    redirect_stderr=true
+    stdout_logfile=/path/to/web-monitoring/storage/logs/worker.log
+    stopwaitsecs=3600
+    
+    # Reload supervisor
+    sudo supervisorctl reread
+    sudo supervisorctl update
+    sudo supervisorctl start web-monitor-worker:*
+    ```
 
 ## Usage
 
@@ -154,25 +181,11 @@ php artisan monitor:prune --dry-run
 php artisan db:seed --class=WebsiteSeeder
 ```
 
-### Queue Processing
-For background monitoring jobs:
-```bash
-# Development
-php artisan queue:work
-
-# Production (with Laravel Sail)
-./vendor/bin/sail artisan queue:work --daemon
-```
-
 ### Scheduled Tasks
 The application automatically schedules:
 - **Website monitoring**: Twice daily at 12:00 AM and 12:00 PM
 - **Data pruning**: Once daily
 
-For production, add this cron job:
-```bash
-* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
-```
 
 ## Configuration
 
@@ -185,13 +198,10 @@ QUEUE_CONNECTION=database
 DB_CONNECTION=sqlite
 DB_DATABASE=/absolute/path/to/database.sqlite
 
-# Screenshot settings
-BROWSERSHOT_CHROME_PATH=/usr/bin/google-chrome
 ```
 
 ### Admin Panel Access
 - **URL**: `/admin`
-- **Default Login**: Create via `php artisan tinker`
 - **Features**: Website management, monitoring, CSV import, notifications
 
 ### Public Status Page
@@ -224,7 +234,7 @@ routes/console.php       # Scheduled tasks
 
 ## Screenshots
 
-The application captures full-page screenshots (1920x1080) with network idle detection. Screenshots are stored in `storage/app/public/screenshots/` and accessible through the admin panel.
+The application captures optimized JPEG screenshots (1280x720, 70% quality) with network idle detection. Screenshots are stored in `storage/app/public/screenshots/` and accessible through the admin panel and web URLs after running `php artisan storage:link`.
 
 
 ## Contributing
