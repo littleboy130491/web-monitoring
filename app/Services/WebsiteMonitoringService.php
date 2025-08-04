@@ -196,6 +196,8 @@ class WebsiteMonitoringService
                 ->setOption('no-first-run', true)
                 ->setOption('disable-gpu', true)
                 ->setOption('disable-dev-shm-usage', true)
+                ->setOption('disable-web-security', true)
+                ->setOption('user-data-dir', '/tmp/chromium-' . uniqid())
                 ->save($fullPath);
 
             // Verify the file was created and has content
