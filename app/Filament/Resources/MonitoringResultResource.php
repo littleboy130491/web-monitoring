@@ -133,6 +133,9 @@ class MonitoringResultResource extends Resource
                 Tables\Filters\Filter::make('no_screenshot')
                     ->query(fn(Builder $query): Builder => $query->whereNull('screenshot_path'))
                     ->label('No Screenshot'),
+                Tables\Filters\Filter::make('last_24_hours')
+                    ->query(fn(Builder $query): Builder => $query->where('checked_at', '>=', now()->subDay()))
+                    ->label('Last 24 Hours'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
