@@ -123,11 +123,10 @@
                             @endif
                         </div>
                         <div>
-                            <h3 class="font-medium text-gray-900">{{ $website->url }}</h3>
+                            <h3 class="font-medium text-gray-900"><a href="{{ $website->url }}" target="_blank">{{ $website->url }}</a></h3>
                             @if($website->description)
                                 <p class="text-sm text-gray-500">{{ $website->description }}</p>
                             @endif
-                            <p class="text-xs text-gray-400">{{ $website->url }}</p>
                         </div>
                     </div>
                     <div class="text-right">
