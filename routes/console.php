@@ -9,5 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule monitoring tasks
-Schedule::command('monitor:websites')->twiceDaily(12, 0)->withoutOverlapping();
+Schedule::command('monitor:websites --screenshot')->twiceDaily(12, 0)->withoutOverlapping();
 Schedule::command('monitor:prune')->daily();
