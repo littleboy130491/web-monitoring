@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\WebsiteResource\Pages;
 use App\Filament\Resources\WebsiteResource\RelationManagers;
+use App\Filament\Resources\WebsiteResource\RelationManagers\MonitoringResultsRelationManager;
 use App\Models\Website;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -135,7 +136,7 @@ class WebsiteResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\MonitoringResultsRelationManager::class,
         ];
     }
 
