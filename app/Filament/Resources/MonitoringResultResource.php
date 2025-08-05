@@ -101,7 +101,7 @@ class MonitoringResultResource extends Resource
                     ->width(70)
                     ->label('Screenshot')
                     ->visibility('public')
-                    ->url(fn($record): string => $record->screenshot_path)
+                    ->url(fn($record): string => $record->screenshot_path ?? '')
                     ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('checked_at')
                     ->dateTime()
