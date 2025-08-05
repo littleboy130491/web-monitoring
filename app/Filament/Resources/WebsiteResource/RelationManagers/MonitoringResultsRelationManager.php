@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\WebsiteResource\RelationManagers;
 
+use App\Filament\Resources\MonitoringResultResource;
 use App\Models\MonitoringResult;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -116,7 +117,12 @@ class MonitoringResultsRelationManager extends RelationManager
                     ->label('Last 24 Hours'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make('view')
+                    ->label('View Details')
+                    ->icon('heroicon-o-eye')
+                    ->color('primary')
+                    ->url(fn(MonitoringResult $record): string => MonitoringResultResource::getUrl('view', ['record' => $record]))
+                    ->openUrlInNewTab(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
