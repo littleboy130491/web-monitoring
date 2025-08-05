@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Storage;
 
 class MonitoringResultResource extends Resource
 {
@@ -101,7 +102,7 @@ class MonitoringResultResource extends Resource
                     ->width(70)
                     ->label('Screenshot')
                     ->visibility('public')
-                    ->url(fn($record): string => $record->screenshot_path ?? '')
+                    ->url(fn($record): string => ($record->screenshot_path ? Storage::url('$record->screenshot_path') : ''))
                     ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('checked_at')
                     ->dateTime()
