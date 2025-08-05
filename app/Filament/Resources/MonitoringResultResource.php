@@ -59,7 +59,9 @@ class MonitoringResultResource extends Resource
                 Tables\Columns\TextColumn::make('website.url')
                     ->sortable()
                     ->searchable()
-                    ->label('Website'),
+                    ->label('Website')
+                    ->url(fn($record): string => $record->website->url)
+                    ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
@@ -98,7 +100,9 @@ class MonitoringResultResource extends Resource
                     ->height(50)
                     ->width(70)
                     ->label('Screenshot')
-                    ->visibility('public'),
+                    ->visibility('public')
+                    ->url(fn($record): string => $record->screenshot_path)
+                    ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('checked_at')
                     ->dateTime()
                     ->sortable()
