@@ -200,7 +200,7 @@ class MonitoringResultResource extends Resource
                     ->label('Last 24 Hours'),
                 Tables\Filters\Filter::make('has_broken_assets')
                     ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
-                        ->whereRaw("json_array_length(json_extract(scan_results, '$.broken_assets')) > 0"))
+                        ->whereRaw("JSON_LENGTH(scan_results, '$.broken_assets') > 0"))
                     ->label('Has Broken Assets'),
                 Tables\Filters\Filter::make('content_scan_changed')
                     ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
