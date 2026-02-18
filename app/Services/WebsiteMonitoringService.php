@@ -72,9 +72,14 @@ class WebsiteMonitoringService
             $result['domain_days_until_expiry'] = $domainInfo['domain_days_until_expiry'];
 
             // Deep scan: save page text snapshots and diff against previous
-            $scanData = $this->performDeepScan($website, $html);
-            $result['content_changed'] = $scanData['any_significant_change'];
-            $result['scan_results'] = $scanData;
+            try {
+                $scanData = $this->performDeepScan($website, $html);
+                $result['content_changed'] = $scanData['any_significant_change'];
+                $result['scan_results'] = $scanData;
+            } catch (\Exception $e) {
+                Log::warning("Deep scan failed for {$website->url}: " . $e->getMessage());
+                // Leave scan_results null; do not affect status
+            }
 
             // Take screenshot if requested and website is up
             if ($takeScreenshot && $result['status'] === 'up') {
