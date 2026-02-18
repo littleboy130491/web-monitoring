@@ -14,17 +14,18 @@ class PruneMonitoringData extends Command
      *
      * @var string
      */
-    protected $signature = 'monitor:prune 
+    protected $signature = 'monitor:prune
                             {--days=30 : Number of days to retain data (default: 30)}
                             {--dry-run : Show what would be deleted without actually deleting}
-                            {--keep-screenshots : Keep screenshot files even if data is deleted}';
+                            {--keep-screenshots : Keep screenshot files even if data is deleted}
+                            {--keep-scans : Keep scan snapshot files even if data is deleted}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Prune old monitoring data and screenshots older than specified days';
+    protected $description = 'Prune old monitoring data, screenshots, and scan snapshots older than specified days';
 
     /**
      * Execute the console command.
@@ -34,6 +35,7 @@ class PruneMonitoringData extends Command
         $days = (float) $this->option('days');
         $dryRun = $this->option('dry-run');
         $keepScreenshots = $this->option('keep-screenshots');
+        $keepScans = $this->option('keep-scans');
 
         if ($days < 0) {
             $this->error('Days must be a non-negative number.');
@@ -89,10 +91,27 @@ class PruneMonitoringData extends Command
             }
         }
 
+        // Handle scan snapshot files
+        $scanFilesToDelete = [];
+        if (!$keepScans) {
+            $scanFilesToDelete = $this->collectOldScanFiles($cutoffDate);
+            if (!empty($scanFilesToDelete)) {
+                $this->info("📄 Found " . count($scanFilesToDelete) . " scan snapshot(s) to delete");
+            }
+        }
+
         // Confirm deletion
         if (!$dryRun) {
-            if (!$this->confirm("Are you sure you want to delete {$oldResults->count()} monitoring records" . 
-                (!$keepScreenshots && !empty($screenshotsToDelete) ? " and " . count($screenshotsToDelete) . " screenshots" : "") . "?")) {
+            $extras = [];
+            if (!$keepScreenshots && !empty($screenshotsToDelete)) {
+                $extras[] = count($screenshotsToDelete) . " screenshots";
+            }
+            if (!$keepScans && !empty($scanFilesToDelete)) {
+                $extras[] = count($scanFilesToDelete) . " scan snapshot(s)";
+            }
+            $extraMsg = $extras ? " and " . implode(', ', $extras) : "";
+
+            if (!$this->confirm("Are you sure you want to delete {$oldResults->count()} monitoring records{$extraMsg}?")) {
                 $this->info('❌ Operation cancelled.');
                 return Command::SUCCESS;
             }
@@ -101,12 +120,14 @@ class PruneMonitoringData extends Command
         $deletedRecords = 0;
         $deletedScreenshots = 0;
         $screenshotErrors = 0;
+        $deletedScans = 0;
+        $scanErrors = 0;
 
         if (!$dryRun) {
             // Delete screenshots first
             if (!$keepScreenshots && !empty($screenshotsToDelete)) {
                 $this->info('🗑️  Deleting screenshots...');
-                
+
                 $screenshotBar = $this->output->createProgressBar(count($screenshotsToDelete));
                 $screenshotBar->start();
 
@@ -126,9 +147,35 @@ class PruneMonitoringData extends Command
                 $this->line('');
             }
 
+            // Delete scan snapshots
+            if (!$keepScans && !empty($scanFilesToDelete)) {
+                $this->info('🗑️  Deleting scan snapshots...');
+
+                $scanBar = $this->output->createProgressBar(count($scanFilesToDelete));
+                $scanBar->start();
+
+                foreach ($scanFilesToDelete as $filePath) {
+                    try {
+                        if (file_exists($filePath)) {
+                            unlink($filePath);
+                            $deletedScans++;
+                        }
+                    } catch (\Exception $e) {
+                        $scanErrors++;
+                        $this->warn("Failed to delete scan file: {$filePath} - {$e->getMessage()}");
+                    }
+                    $scanBar->advance();
+                }
+                $scanBar->finish();
+                $this->line('');
+
+                // Remove empty directories left behind
+                $this->removeEmptyScanDirs();
+            }
+
             // Delete monitoring records
             $this->info('🗑️  Deleting monitoring records...');
-            
+
             $recordBar = $this->output->createProgressBar($oldResults->count());
             $recordBar->start();
 
@@ -147,11 +194,14 @@ class PruneMonitoringData extends Command
 
         // Summary
         $this->info('📋 Pruning Summary:');
-        
+
         if ($dryRun) {
             $this->line("  🔍 Would delete: {$oldResults->count()} monitoring records");
             if (!$keepScreenshots && !empty($screenshotsToDelete)) {
                 $this->line("  🔍 Would delete: " . count($screenshotsToDelete) . " screenshots");
+            }
+            if (!$keepScans && !empty($scanFilesToDelete)) {
+                $this->line("  🔍 Would delete: " . count($scanFilesToDelete) . " scan snapshot(s)");
             }
         } else {
             $this->line("  ✅ Deleted: {$deletedRecords} monitoring records");
@@ -159,6 +209,12 @@ class PruneMonitoringData extends Command
                 $this->line("  ✅ Deleted: {$deletedScreenshots} screenshots");
                 if ($screenshotErrors > 0) {
                     $this->line("  ⚠️  Screenshot errors: {$screenshotErrors}");
+                }
+            }
+            if (!$keepScans) {
+                $this->line("  ✅ Deleted: {$deletedScans} scan snapshot(s)");
+                if ($scanErrors > 0) {
+                    $this->line("  ⚠️  Scan file errors: {$scanErrors}");
                 }
             }
         }
@@ -171,7 +227,53 @@ class PruneMonitoringData extends Command
         }
         
         $this->info('🎉 Pruning completed successfully!');
-        
-        return Command::SUCCESS;
+    }
+
+    /**
+     * Collect all scan snapshot .txt files older than the cutoff date.
+     */
+    private function collectOldScanFiles(\Carbon\Carbon $cutoffDate): array
+    {
+        $scansDir = storage_path('app/scans');
+        if (!is_dir($scansDir)) {
+            return [];
+        }
+
+        $old = [];
+        $cutoffTimestamp = $cutoffDate->timestamp;
+
+        // Glob pattern: scans/{website}/{page}/*.txt
+        foreach (glob($scansDir . '/*/*/*.txt') as $file) {
+            if (filemtime($file) < $cutoffTimestamp) {
+                $old[] = $file;
+            }
+        }
+
+        return $old;
+    }
+
+    /**
+     * Remove empty page/website directories left after scan file deletion.
+     */
+    private function removeEmptyScanDirs(): void
+    {
+        $scansDir = storage_path('app/scans');
+        if (!is_dir($scansDir)) {
+            return;
+        }
+
+        // Page-level directories
+        foreach (glob($scansDir . '/*/*', GLOB_ONLYDIR) as $pageDir) {
+            if (count(glob($pageDir . '/*')) === 0) {
+                @rmdir($pageDir);
+            }
+        }
+
+        // Website-level directories
+        foreach (glob($scansDir . '/*', GLOB_ONLYDIR) as $siteDir) {
+            if (count(glob($siteDir . '/*')) === 0) {
+                @rmdir($siteDir);
+            }
+        }
     }
 }
