@@ -25,7 +25,20 @@
       "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" artisan make:migration create_monitoring_reports_table)",
       "Bash(for f in app/Models/MonitoringReport.php app/Mail/MonitoringReportMail.php app/Services/MonitoringReportService.php app/Console/Commands/MonitorWebsites.php app/Filament/Resources/MonitoringReportResource.php app/Filament/Resources/MonitoringReportResource/Pages/ListMonitoringReports.php app/Filament/Resources/MonitoringReportResource/Pages/ViewMonitoringReport.php config/monitoring.php)",
       "Bash(C:/Users/user/.config/herd/bin/php.bat artisan:*)",
-      "Bash(C:/Users/user/.config/herd/bin/php.bat:*)"
+      "Bash(C:/Users/user/.config/herd/bin/php.bat:*)",
+      "Bash(whois:*)",
+      "WebSearch",
+      "WebFetch(domain:www.nirsoft.net)",
+      "Bash(php:*)",
+      "Bash(php.bat artisan tinker --execute=\"echo @fsockopen\\(''whois.nic.co'', 43, $e, $s, 5\\) ? ''OK'' : ''FAIL: ''.$s;\")",
+      "Bash(php.bat -r \"\n$socket = @fsockopen\\(''whois.nic.co'', 43, $errno, $errstr, 5\\);\nif \\(!$socket\\) { echo ''FAIL: [''.$errno.''] ''.$errstr.\"\"\\\\n\"\"; } else { echo \"\"OK\\\\n\"\"; fclose\\($socket\\); }\n\")",
+      "Bash(php.bat:*)",
+      "Bash(nslookup:*)",
+      "Bash(echo:*)",
+      "Bash(Test-NetConnection whois.registry.co -Port 43)",
+      "Bash(powershell -Command \"Test-NetConnection whois.registry.co -Port 43\")",
+      "Bash(composer require:*)",
+      "Bash(composer.bat require:*)"
     ]
   }
 }

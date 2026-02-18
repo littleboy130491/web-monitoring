@@ -51,7 +51,10 @@ return [
 
         'mailgun' => [
             'transport' => 'mailgun',
-            // Uses MAILGUN_SECRET and MAILGUN_DOMAIN from services.php / .env
+            'domain' => env('MAILGUN_DOMAIN'),
+            'secret' => env('MAILGUN_SECRET'),
+            'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+            'scheme' => 'https',
         ],
 
         'ses' => [
