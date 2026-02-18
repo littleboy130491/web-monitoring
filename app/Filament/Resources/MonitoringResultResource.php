@@ -111,32 +111,26 @@ class MonitoringResultResource extends Resource
                     ->visibility('public')
                     ->url(fn($record): string => ($record->screenshot_path ? Storage::url($record->screenshot_path) : ''))
                     ->openUrlInNewTab(),
-                Tables\Columns\TextColumn::make('scan_results')
+                Tables\Columns\TextColumn::make('scan_badge')
                     ->label('Scan')
-                    ->formatStateUsing(function ($state): string {
-                        if (empty($state)) return '—';
-                        $data = is_array($state) ? $state : json_decode($state, true);
-                        if (!$data) return '—';
-
+                    ->getStateUsing(function ($record): string {
+                        $data = $record->scan_results;
+                        if (empty($data)) return '—';
                         $broken = count($data['broken_assets'] ?? []);
-                        if ($broken > 0) {
-                            return "{$broken} broken asset(s)";
-                        }
+                        if ($broken > 0) return "{$broken} broken asset(s)";
                         return count($data['pages'] ?? []) . ' page(s) OK';
                     })
-                    ->color(function ($state): string {
-                        if (empty($state)) return 'gray';
-                        $data = is_array($state) ? $state : json_decode($state, true);
-                        if (!$data) return 'gray';
+                    ->color(function ($record): string {
+                        $data = $record->scan_results;
+                        if (empty($data)) return 'gray';
                         if ($data['any_significant_change'] ?? false) return 'warning';
                         if (!empty($data['broken_assets'])) return 'warning';
                         return 'success';
                     })
                     ->badge()
-                    ->tooltip(function ($state): ?string {
-                        if (empty($state)) return null;
-                        $data = is_array($state) ? $state : json_decode($state, true);
-                        if (!$data) return null;
+                    ->tooltip(function ($record): ?string {
+                        $data = $record->scan_results;
+                        if (empty($data)) return null;
                         $lines = [];
                         foreach ($data['pages'] ?? [] as $page) {
                             $flag = $page['significant'] ? ' ⚠' : '';
