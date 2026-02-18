@@ -93,9 +93,10 @@ class MonitoringResultResource extends Resource
                         $state >= 3000 => 'danger',
                         default => 'gray',
                     }),
-                Tables\Columns\IconColumn::make('content_changed')
+                Tables\Columns\IconColumn::make('scan_results.any_significant_change')
                     ->boolean()
-                    ->label('Content Changed'),
+                    ->label('Significant Content Changed')
+                    ->getStateUsing(fn($record) => (bool) ($record->scan_results['any_significant_change'] ?? false)),
                 Tables\Columns\ImageColumn::make('screenshot_path')
                     ->disk('public')
                     ->height(50)

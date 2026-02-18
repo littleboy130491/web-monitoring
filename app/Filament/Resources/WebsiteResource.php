@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Actions\MonitoringActions;
 use App\Filament\Resources\WebsiteResource\Pages;
 use App\Filament\Resources\WebsiteResource\RelationManagers;
 use App\Filament\Resources\WebsiteResource\RelationManagers\MonitoringResultsRelationManager;
@@ -94,15 +95,7 @@ class WebsiteResource extends Resource
                     ->label('Monitor')
                     ->icon('heroicon-o-play')
                     ->color('success')
-                    ->action(function (Website $record) {
-                        \App\Jobs\MonitorWebsiteJob::dispatch($record, false, 30);
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Monitoring Queued')
-                            ->body("Website '{$record->url}' has been queued for monitoring")
-                            ->success()
-                            ->send();
-                    })
+                    ->action(fn(Website $record) => MonitoringActions::dispatchMonitor($record))
                     ->requiresConfirmation()
                     ->modalHeading('Monitor Website')
                     ->modalDescription(fn(Website $record) => "Queue monitoring for '{$record->url}'?")
@@ -111,15 +104,7 @@ class WebsiteResource extends Resource
                     ->label('Monitor + Screenshot')
                     ->icon('heroicon-o-camera')
                     ->color('warning')
-                    ->action(function (Website $record) {
-                        \App\Jobs\MonitorWebsiteJob::dispatch($record, true, 30);
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Monitoring with Screenshot Queued')
-                            ->body("Website '{$record->url}' has been queued for monitoring with screenshot")
-                            ->success()
-                            ->send();
-                    })
+                    ->action(fn(Website $record) => MonitoringActions::dispatchMonitor($record, true))
                     ->requiresConfirmation()
                     ->modalHeading('Monitor Website with Screenshot')
                     ->modalDescription(fn(Website $record) => "Queue monitoring with screenshot for '{$record->url}'? This may take longer.")

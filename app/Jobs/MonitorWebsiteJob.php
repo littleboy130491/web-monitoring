@@ -6,13 +6,14 @@ use App\Models\Website;
 use App\Models\MonitoringResult;
 use App\Models\User;
 use App\Services\WebsiteMonitoringService;
+use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Filament\Notifications\Notification;
 
 class MonitorWebsiteJob implements ShouldQueue
 {
-    use Queueable;
+    use Batchable, Queueable;
 
     public $timeout = 120; // 2 minutes timeout
     public $tries = 3;

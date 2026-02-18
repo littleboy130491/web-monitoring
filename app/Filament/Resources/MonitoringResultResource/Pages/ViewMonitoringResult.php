@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MonitoringResultResource\Pages;
 
+use App\Filament\Actions\MonitoringActions;
 use App\Filament\Resources\MonitoringResultResource;
 use Filament\Actions;
 use Filament\Infolists\Components;
@@ -60,19 +61,6 @@ class ViewMonitoringResult extends ViewRecord
                     ])
                     ->columns(3),
 
-                Components\Section::make('Content & Changes')
-                    ->schema([
-                        Components\IconEntry::make('content_changed')
-                            ->label('Content Changed')
-                            ->boolean(),
-                        Components\TextEntry::make('content_hash')
-                            ->label('Content Hash')
-                            ->limit(50)
-                            ->tooltip(fn($state) => $state),
-                    ])
-                    ->columns(2)
-                    ->collapsible(),
-
                 Components\Section::make('Screenshot')
                     ->schema([
                         Components\ImageEntry::make('screenshot_path')
@@ -120,6 +108,10 @@ class ViewMonitoringResult extends ViewRecord
                             })
                             ->html()
                             ->columnSpanFull(),
+                        Components\IconEntry::make('scan_results.any_significant_change')
+                            ->label('Significant Content Changed')
+                            ->boolean()
+                            ->getStateUsing(fn($record) => (bool) ($record->scan_results['any_significant_change'] ?? false)),
                     ])
                     ->visible(fn ($record) => !empty($record->scan_results))
                     ->collapsible(),
@@ -216,35 +208,19 @@ class ViewMonitoringResult extends ViewRecord
                 ->label('Recheck')
                 ->icon('heroicon-o-arrow-path')
                 ->color('primary')
-                ->action(function ($record) {
-                    \App\Jobs\MonitorWebsiteJob::dispatch($record->website, false, 30);
-                    
-                    \Filament\Notifications\Notification::make()
-                        ->title('Monitoring Queued')
-                        ->body("Website '{$record->website->url}' has been queued for monitoring")
-                        ->success()
-                        ->send();
-                })
+                ->action(fn($record) => MonitoringActions::dispatchMonitor($record->website))
                 ->requiresConfirmation()
                 ->modalHeading('Recheck Website')
-                ->modalDescription(fn ($record) => "Queue monitoring for '{$record->website->url}'?")
+                ->modalDescription(fn($record) => "Queue monitoring for '{$record->website->url}'?")
                 ->modalSubmitActionLabel('Yes, Recheck'),
             Actions\Action::make('recheck_with_screenshot')
                 ->label('Recheck + Screenshot')
                 ->icon('heroicon-o-camera')
                 ->color('warning')
-                ->action(function ($record) {
-                    \App\Jobs\MonitorWebsiteJob::dispatch($record->website, true, 30);
-                    
-                    \Filament\Notifications\Notification::make()
-                        ->title('Monitoring with Screenshot Queued')
-                        ->body("Website '{$record->website->url}' has been queued for monitoring with screenshot")
-                        ->success()
-                        ->send();
-                })
+                ->action(fn($record) => MonitoringActions::dispatchMonitor($record->website, true))
                 ->requiresConfirmation()
                 ->modalHeading('Recheck Website with Screenshot')
-                ->modalDescription(fn ($record) => "Queue monitoring with screenshot for '{$record->website->url}'? This may take longer.")
+                ->modalDescription(fn($record) => "Queue monitoring with screenshot for '{$record->website->url}'? This may take longer.")
                 ->modalSubmitActionLabel('Yes, Recheck with Screenshot'),
         ];
     }
