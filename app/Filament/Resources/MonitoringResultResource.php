@@ -114,24 +114,15 @@ class MonitoringResultResource extends Resource
                 Tables\Columns\TextColumn::make('scan_results')
                     ->label('Scan')
                     ->formatStateUsing(function ($state): string {
-                        if (empty($state)) {
-                            return '—';
-                        }
+                        if (empty($state)) return '—';
                         $data = is_array($state) ? $state : json_decode($state, true);
                         if (!$data) return '—';
 
-                        $pages = $data['pages'] ?? [];
                         $broken = count($data['broken_assets'] ?? []);
-                        $changed = collect($pages)->where('significant', true)->count();
-
-                        $parts = [];
-                        if ($changed > 0) {
-                            $parts[] = "{$changed} page(s) changed";
-                        }
                         if ($broken > 0) {
-                            $parts[] = "{$broken} broken asset(s)";
+                            return "{$broken} broken asset(s)";
                         }
-                        return $parts ? implode(', ', $parts) : count($pages) . ' page(s) OK';
+                        return count($data['pages'] ?? []) . ' page(s) OK';
                     })
                     ->color(function ($state): string {
                         if (empty($state)) return 'gray';

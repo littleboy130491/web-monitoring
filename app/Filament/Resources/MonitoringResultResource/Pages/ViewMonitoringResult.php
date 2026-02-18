@@ -74,12 +74,11 @@ class ViewMonitoringResult extends ViewRecord
 
                 Components\Section::make('Deep Scan Results')
                     ->schema([
-                        Components\TextEntry::make('scan_results')
+                        Components\TextEntry::make('scan_summary')
                             ->label('Page Snapshots')
-                            ->formatStateUsing(function ($state) {
-                                if (empty($state)) return 'No scan data available.';
-                                $data = is_array($state) ? $state : json_decode($state, true);
-                                if (!$data) return 'No scan data available.';
+                            ->getStateUsing(function ($record): string {
+                                $data = $record->scan_results;
+                                if (empty($data)) return 'No scan data available.';
 
                                 $rows = '';
                                 foreach ($data['pages'] ?? [] as $page) {
