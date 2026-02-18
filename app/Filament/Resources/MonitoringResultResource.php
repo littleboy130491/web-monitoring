@@ -97,6 +97,10 @@ class MonitoringResultResource extends Resource
                     ->boolean()
                     ->label('Significant Content Changed')
                     ->getStateUsing(fn($record) => (bool) ($record->scan_results['any_significant_change'] ?? false)),
+                Tables\Columns\IconColumn::make('scan_results.has_broken_assets')
+                    ->boolean()
+                    ->label('Has Broken Assets')
+                    ->getStateUsing(fn($record) => (bool) ($record->scan_results['has_broken_assets'] ?? false)),
                 Tables\Columns\ImageColumn::make('screenshot_path')
                     ->disk('public')
                     ->height(50)
@@ -192,9 +196,6 @@ class MonitoringResultResource extends Resource
                         'error' => 'Error',
                         'warning' => 'Warning',
                     ]),
-                Tables\Filters\Filter::make('content_changed')
-                    ->query(fn(Builder $query): Builder => $query->where('content_changed', true))
-                    ->label('Content Changed'),
                 Tables\Filters\Filter::make('has_screenshot')
                     ->query(fn(Builder $query): Builder => $query->whereNotNull('screenshot_path'))
                     ->label('Has Screenshot'),

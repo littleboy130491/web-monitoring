@@ -23,7 +23,9 @@
       "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" \"C:\\\\Users\\\\user\\\\Herd\\\\web-monitoring\\\\vendor\\\\bin\\\\composer\" require:*)",
       "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\composer.bat\" require symfony/mailgun-mailer)",
       "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" artisan make:migration create_monitoring_reports_table)",
-      "Bash(for f in app/Models/MonitoringReport.php app/Mail/MonitoringReportMail.php app/Services/MonitoringReportService.php app/Console/Commands/MonitorWebsites.php app/Filament/Resources/MonitoringReportResource.php app/Filament/Resources/MonitoringReportResource/Pages/ListMonitoringReports.php app/Filament/Resources/MonitoringReportResource/Pages/ViewMonitoringReport.php config/monitoring.php)"
+      "Bash(for f in app/Models/MonitoringReport.php app/Mail/MonitoringReportMail.php app/Services/MonitoringReportService.php app/Console/Commands/MonitorWebsites.php app/Filament/Resources/MonitoringReportResource.php app/Filament/Resources/MonitoringReportResource/Pages/ListMonitoringReports.php app/Filament/Resources/MonitoringReportResource/Pages/ViewMonitoringReport.php config/monitoring.php)",
+      "Bash(C:/Users/user/.config/herd/bin/php.bat artisan:*)",
+      "Bash(C:/Users/user/.config/herd/bin/php.bat:*)"
     ]
   }
 }

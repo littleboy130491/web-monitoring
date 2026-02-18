@@ -482,41 +482,67 @@ class WebsiteMonitoringService
                 return $result;
             }
 
-            $domain = implode('.', array_slice($parts, -2));
             $tld = strtolower(end($parts));
+            $sld = count($parts) >= 3 ? strtolower($parts[count($parts) - 2] . '.' . $tld) : null;
+
+            // Second-level domain WHOIS servers — must be checked before TLD map
+            // because domain extraction also differs (3 parts instead of 2)
+            $whoisServersBySld = [
+                'co.id'  => 'whois.id',
+                'or.id'  => 'whois.id',
+                'net.id' => 'whois.id',
+                'go.id'  => 'whois.id',
+                'ac.id'  => 'whois.id',
+                'co.uk'  => 'whois.nic.uk',
+                'org.uk' => 'whois.nic.uk',
+                'me.uk'  => 'whois.nic.uk',
+                'com.au' => 'whois.auda.org.au',
+                'net.au' => 'whois.auda.org.au',
+                'org.au' => 'whois.auda.org.au',
+            ];
 
             $whoisServers = [
-                'com' => 'whois.verisign-grs.com',
-                'net' => 'whois.verisign-grs.com',
-                'org' => 'whois.pir.org',
+                'com'  => 'whois.verisign-grs.com',
+                'net'  => 'whois.verisign-grs.com',
+                'org'  => 'whois.pir.org',
                 'info' => 'whois.afilias.net',
-                'biz' => 'whois.biz',
-                'io'  => 'whois.nic.io',
-                'co'  => 'whois.nic.co',
-                'us'  => 'whois.nic.us',
-                'uk'  => 'whois.nic.uk',
-                'au'  => 'whois.auda.org.au',
-                'de'  => 'whois.denic.de',
-                'fr'  => 'whois.nic.fr',
-                'nl'  => 'whois.domain-registry.nl',
-                'ca'  => 'whois.cira.ca',
-                'app' => 'whois.nic.google',
-                'dev' => 'whois.nic.google',
-                'id'  => 'whois.id',
-                'me'  => 'whois.nic.me',
-                'tv'  => 'whois.nic.tv',
-                'cc'  => 'whois.nic.cc',
+                'biz'  => 'whois.biz',
+                'io'   => 'whois.nic.io',
+                'co'   => 'whois.nic.co',
+                'us'   => 'whois.nic.us',
+                'uk'   => 'whois.nic.uk',
+                'au'   => 'whois.auda.org.au',
+                'de'   => 'whois.denic.de',
+                'fr'   => 'whois.nic.fr',
+                'nl'   => 'whois.domain-registry.nl',
+                'ca'   => 'whois.cira.ca',
+                'app'  => 'whois.nic.google',
+                'dev'  => 'whois.nic.google',
+                'id'   => 'whois.id',
+                'me'   => 'whois.nic.me',
+                'tv'   => 'whois.nic.tv',
+                'cc'   => 'whois.nic.cc',
                 'mobi' => 'whois.dotmobiregistry.net',
                 'name' => 'whois.nic.name',
                 'pro'  => 'whois.registry.pro',
+                'law'  => 'whois.nic.law',
+                'tax'  => 'whois.nic.tax',
             ];
 
-            $whoisServer = $whoisServers[$tld] ?? null;
+            // SLD match: use 3-part registrable domain (e.g. example.co.id)
+            if ($sld && isset($whoisServersBySld[$sld])) {
+                $whoisServer = $whoisServersBySld[$sld];
+                $domain = implode('.', array_slice($parts, -3));
+            } else {
+                $domain = implode('.', array_slice($parts, -2));
+                $whoisServer = $whoisServers[$tld] ?? null;
 
-            if (!$whoisServer) {
-                $ianaResponse = $this->queryWhois('whois.iana.org', $tld, 5);
-                if ($ianaResponse && preg_match('/whois:\s+(\S+)/i', $ianaResponse, $m)) {
-                    $whoisServer = trim($m[1]);
+                // Fallback: ask IANA for the authoritative WHOIS server
+                if (!$whoisServer) {
+                    $ianaResponse = $this->queryWhois('whois.iana.org', $tld, 5);
+                    if ($ianaResponse && preg_match('/whois:\s+(\S+)/i', $ianaResponse, $m)) {
+                        $whoisServer = trim($m[1]);
+                    }
                 }
             }
 
