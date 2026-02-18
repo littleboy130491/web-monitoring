@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\MonitoringResultResource\Pages;
 
 use App\Filament\Resources\MonitoringResultResource;
+use App\Services\MonitoringPruneService;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Pages\ListRecords;
-use Illuminate\Support\Facades\Storage;
 
 class ListMonitoringResults extends ListRecords
 {
@@ -30,43 +30,25 @@ class ListMonitoringResults extends ListRecords
                         ->helperText('Data older than this many days will be deleted. Use 0 to delete all data.'),
                 ])
                 ->action(function (array $data) {
-                    $days = $data['days'];
+                    $days = (int) $data['days'];
                     $cutoffDate = now()->subDays($days);
-                    
-                    // Get records to delete (with screenshots)
-                    $recordsToDelete = \App\Models\MonitoringResult::where('created_at', '<', $cutoffDate)->get();
-                    $deletedCount = $recordsToDelete->count();
-                    
-                    // Delete screenshots first
-                    $deletedScreenshots = 0;
-                    foreach ($recordsToDelete->whereNotNull('screenshot_path') as $record) {
-                        if (Storage::disk('public')->exists($record->screenshot_path)) {
-                            Storage::disk('public')->delete($record->screenshot_path);
-                            $deletedScreenshots++;
-                        }
-                    }
-                    
-                    // Delete records
-                    \App\Models\MonitoringResult::where('created_at', '<', $cutoffDate)->delete();
-                    
-                    $message = "Deleted {$deletedCount} monitoring results";
-                    if ($deletedScreenshots > 0) {
-                        $message .= " and {$deletedScreenshots} screenshots";
-                    }
-                    if ($days == 0) {
-                        $message .= " (all data)";
-                    } else {
-                        $message .= " older than {$days} days";
-                    }
-                    
+
+                    $stats = app(MonitoringPruneService::class)->pruneAll($cutoffDate);
+
+                    $parts = ["{$stats['records']} monitoring result(s)"];
+                    if ($stats['screenshots'] > 0) $parts[] = "{$stats['screenshots']} screenshot(s)";
+                    if ($stats['scans'] > 0)       $parts[] = "{$stats['scans']} scan snapshot(s)";
+
+                    $suffix = $days === 0 ? " (all data)" : " older than {$days} day(s)";
+
                     \Filament\Notifications\Notification::make()
                         ->title('Data Pruned Successfully')
-                        ->body($message)
+                        ->body('Deleted ' . implode(', ', $parts) . $suffix)
                         ->success()
                         ->send();
                 })
                 ->requiresConfirmation()
-                ->modalDescription('This action will permanently delete old monitoring results and cannot be undone.'),
+                ->modalDescription('This action will permanently delete old monitoring results, screenshots, and scan snapshots. This cannot be undone.'),
         ];
     }
 }
