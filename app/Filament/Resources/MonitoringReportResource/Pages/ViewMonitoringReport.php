@@ -83,10 +83,9 @@ class ViewMonitoringReport extends ViewRecord
 
             Components\Section::make('Email Preview')
                 ->schema([
-                    Components\TextEntry::make('body_html')
+                    Components\ViewEntry::make('body_html')
                         ->label('')
-                        ->formatStateUsing(fn($state) => '<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">' . $state . '</div>')
-                        ->html()
+                        ->view('filament.infolists.email-preview')
                         ->columnSpanFull(),
                 ])
                 ->collapsible()
