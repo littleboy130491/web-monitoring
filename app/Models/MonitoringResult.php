@@ -18,6 +18,8 @@ class MonitoringResult extends Model
         'screenshot_path',
         'headers',
         'ssl_info',
+        'domain_expires_at',
+        'domain_days_until_expiry',
         'checked_at',
     ];
 
@@ -25,8 +27,10 @@ class MonitoringResult extends Model
         'content_changed' => 'boolean',
         'ssl_info' => 'array',
         'checked_at' => 'datetime',
+        'domain_expires_at' => 'date',
         'status_code' => 'integer',
         'response_time' => 'integer',
+        'domain_days_until_expiry' => 'integer',
     ];
 
     public function website(): BelongsTo

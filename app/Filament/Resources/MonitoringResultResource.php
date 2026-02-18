@@ -104,6 +104,23 @@ class MonitoringResultResource extends Resource
                     ->visibility('public')
                     ->url(fn($record): string => ($record->screenshot_path ? Storage::url($record->screenshot_path) : ''))
                     ->openUrlInNewTab(),
+                Tables\Columns\TextColumn::make('domain_days_until_expiry')
+                    ->label('Domain Expiry')
+                    ->sortable()
+                    ->formatStateUsing(fn (?int $state): string => match (true) {
+                        $state === null => '—',
+                        $state <= 0    => 'Expired',
+                        default        => "{$state}d left",
+                    })
+                    ->color(fn (?int $state): string => match (true) {
+                        $state === null  => 'gray',
+                        $state <= 0      => 'danger',
+                        $state <= 7      => 'danger',
+                        $state <= 30     => 'warning',
+                        default          => 'success',
+                    })
+                    ->badge()
+                    ->tooltip(fn ($record): ?string => $record->domain_expires_at?->format('Y-m-d')),
                 Tables\Columns\TextColumn::make('checked_at')
                     ->dateTime()
                     ->sortable()
@@ -141,6 +158,12 @@ class MonitoringResultResource extends Resource
                 Tables\Filters\Filter::make('last_24_hours')
                     ->query(fn(Builder $query): Builder => $query->where('checked_at', '>=', now()->subDay()))
                     ->label('Last 24 Hours'),
+                Tables\Filters\Filter::make('domain_expiring_soon')
+                    ->query(fn(Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 7))
+                    ->label('Domain Expiring ≤7 Days'),
+                Tables\Filters\Filter::make('domain_expired')
+                    ->query(fn(Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 0))
+                    ->label('Domain Expired'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

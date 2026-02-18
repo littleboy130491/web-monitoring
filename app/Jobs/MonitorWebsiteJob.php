@@ -74,6 +74,11 @@ class MonitorWebsiteJob implements ShouldQueue
             if ($result->status === 'up' && $result->screenshot_path) {
                 $this->sendScreenshotNotification($user, $result);
             }
+
+            // Notification for domain expiring soon (≤ 7 days)
+            if ($result->domain_days_until_expiry !== null && $result->domain_days_until_expiry <= 7) {
+                $this->sendDomainExpiryNotification($user, $result);
+            }
         }
     }
 
@@ -130,6 +135,27 @@ class MonitorWebsiteJob implements ShouldQueue
             ->body("{$this->website->url} is up and screenshot captured successfully")
             ->icon('heroicon-o-camera')
             ->color('success')
+            ->sendToDatabase($user);
+    }
+
+    private function sendDomainExpiryNotification(User $user, MonitoringResult $result): void
+    {
+        $days = $result->domain_days_until_expiry;
+        $expiresAt = $result->domain_expires_at?->format('Y-m-d');
+
+        if ($days <= 0) {
+            $body = "{$this->website->url} domain has EXPIRED (expired on {$expiresAt})";
+            $color = 'danger';
+        } else {
+            $body = "{$this->website->url} domain expires in {$days} day(s) on {$expiresAt}";
+            $color = 'warning';
+        }
+
+        Notification::make()
+            ->title('Domain Expiring Soon')
+            ->body($body)
+            ->icon('heroicon-o-calendar')
+            ->color($color)
             ->sendToDatabase($user);
     }
 }

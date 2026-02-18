@@ -59,6 +59,11 @@ class WebsiteMonitoringService
                 $result['ssl_info'] = $sslInfo ? json_encode($sslInfo) : null;
             }
 
+            // Domain expiry via WHOIS
+            $domainInfo = $this->getDomainInfo($website->url);
+            $result['domain_expires_at'] = $domainInfo['domain_expires_at'];
+            $result['domain_days_until_expiry'] = $domainInfo['domain_days_until_expiry'];
+
             // Take screenshot if requested and website is up
             if ($takeScreenshot && $result['status'] === 'up') {
                 $result['screenshot_path'] = $this->takeScreenshot($website);
@@ -91,6 +96,8 @@ class WebsiteMonitoringService
             'error_message' => null,
             'headers' => null,
             'ssl_info' => null,
+            'domain_expires_at' => null,
+            'domain_days_until_expiry' => null,
             'content_hash' => null,
             'content_changed' => false,
             'screenshot_path' => null,
@@ -214,6 +221,139 @@ class WebsiteMonitoringService
             Log::error("Screenshot failed for {$website->url}: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Get domain expiry information via WHOIS
+     */
+    private function getDomainInfo(string $url): array
+    {
+        $result = [
+            'domain_expires_at' => null,
+            'domain_days_until_expiry' => null,
+        ];
+
+        try {
+            $host = parse_url($url, PHP_URL_HOST);
+            if (!$host) {
+                return $result;
+            }
+
+            // Remove port if present
+            $host = preg_replace('/:\d+$/', '', $host);
+
+            // Extract registrable domain (strip subdomains)
+            $parts = explode('.', $host);
+            if (count($parts) < 2) {
+                return $result;
+            }
+            $domain = implode('.', array_slice($parts, -2));
+            $tld = strtolower(end($parts));
+
+            // Map of TLDs to their WHOIS servers
+            $whoisServers = [
+                'com' => 'whois.verisign-grs.com',
+                'net' => 'whois.verisign-grs.com',
+                'org' => 'whois.pir.org',
+                'info' => 'whois.afilias.net',
+                'biz' => 'whois.biz',
+                'io'  => 'whois.nic.io',
+                'co'  => 'whois.nic.co',
+                'us'  => 'whois.nic.us',
+                'uk'  => 'whois.nic.uk',
+                'au'  => 'whois.auda.org.au',
+                'de'  => 'whois.denic.de',
+                'fr'  => 'whois.nic.fr',
+                'nl'  => 'whois.domain-registry.nl',
+                'ca'  => 'whois.cira.ca',
+                'app' => 'whois.nic.google',
+                'dev' => 'whois.nic.google',
+                'id'  => 'whois.id',
+                'me'  => 'whois.nic.me',
+                'tv'  => 'whois.nic.tv',
+                'cc'  => 'whois.nic.cc',
+                'mobi' => 'whois.dotmobiregistry.net',
+                'name' => 'whois.nic.name',
+                'pro'  => 'whois.registry.pro',
+            ];
+
+            $whoisServer = $whoisServers[$tld] ?? null;
+
+            // For unknown TLDs, try IANA to find the WHOIS server
+            if (!$whoisServer) {
+                $ianaResponse = $this->queryWhois('whois.iana.org', $tld, 5);
+                if ($ianaResponse && preg_match('/whois:\s+(\S+)/i', $ianaResponse, $m)) {
+                    $whoisServer = trim($m[1]);
+                }
+            }
+
+            if (!$whoisServer) {
+                return $result;
+            }
+
+            $response = $this->queryWhois($whoisServer, $domain, 10);
+            if (!$response) {
+                return $result;
+            }
+
+            // Try multiple common expiry date patterns
+            $patterns = [
+                '/Registry Expiry Date:\s*(.+)/i',
+                '/Expiry Date:\s*(.+)/i',
+                '/Expiration Date:\s*(.+)/i',
+                '/Expires On:\s*(.+)/i',
+                '/expires:\s*(.+)/i',
+                '/paid-till:\s*(.+)/i',
+                '/expire:\s*(.+)/i',
+                '/Registrar Registration Expiration Date:\s*(.+)/i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $response, $matches)) {
+                    $expiryStr = trim($matches[1]);
+                    // Strip timezone info in brackets or extra trailing text
+                    $expiryStr = preg_replace('/\s*\(.*\)\s*$/', '', $expiryStr);
+                    $expiryStr = trim($expiryStr);
+
+                    $expiryTimestamp = strtotime($expiryStr);
+                    if ($expiryTimestamp && $expiryTimestamp > 0) {
+                        $result['domain_expires_at'] = date('Y-m-d', $expiryTimestamp);
+                        $result['domain_days_until_expiry'] = (int) (($expiryTimestamp - time()) / 86400);
+                        break;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Domain WHOIS check failed for {$url}: " . $e->getMessage());
+        }
+
+        return $result;
+    }
+
+    /**
+     * Query a WHOIS server and return the raw response
+     */
+    private function queryWhois(string $server, string $query, int $timeout = 10): ?string
+    {
+        $socket = @fsockopen($server, 43, $errno, $errstr, $timeout);
+        if (!$socket) {
+            return null;
+        }
+
+        stream_set_timeout($socket, $timeout);
+        fwrite($socket, $query . "\r\n");
+
+        $response = '';
+        while (!feof($socket)) {
+            $chunk = fgets($socket, 4096);
+            if ($chunk === false) {
+                break;
+            }
+            $response .= $chunk;
+        }
+        fclose($socket);
+
+        return $response ?: null;
     }
 
     /**

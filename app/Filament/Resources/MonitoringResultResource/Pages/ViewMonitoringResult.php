@@ -84,6 +84,32 @@ class ViewMonitoringResult extends ViewRecord
                     ->visible(fn($record) => !empty($record->screenshot_path))
                     ->collapsible(),
 
+                Components\Section::make('Domain Expiry')
+                    ->schema([
+                        Components\TextEntry::make('domain_expires_at')
+                            ->label('Expiry Date')
+                            ->date('Y-m-d')
+                            ->placeholder('Not available'),
+                        Components\TextEntry::make('domain_days_until_expiry')
+                            ->label('Days Until Expiry')
+                            ->formatStateUsing(fn (?int $state): string => match (true) {
+                                $state === null => 'N/A',
+                                $state <= 0     => 'EXPIRED',
+                                default         => "{$state} days",
+                            })
+                            ->color(fn (?int $state): string => match (true) {
+                                $state === null => 'gray',
+                                $state <= 0     => 'danger',
+                                $state <= 7     => 'danger',
+                                $state <= 30    => 'warning',
+                                default         => 'success',
+                            })
+                            ->badge(),
+                    ])
+                    ->columns(2)
+                    ->visible(fn ($record) => $record->domain_expires_at !== null)
+                    ->collapsible(),
+
                 Components\Section::make('SSL Information')
                     ->schema([
                         Components\TextEntry::make('ssl_info')
