@@ -38,7 +38,12 @@
       "Bash(Test-NetConnection whois.registry.co -Port 43)",
       "Bash(powershell -Command \"Test-NetConnection whois.registry.co -Port 43\")",
       "Bash(composer require:*)",
-      "Bash(composer.bat require:*)"
+      "Bash(composer.bat require:*)",
+      "Bash(C:/Windows/System32/cmd.exe /c \"cd C:/Users/user/Herd/web-monitoring && php artisan migrate:status 2>&1\")",
+      "Bash(C:/Windows/System32/cmd.exe /c \"cd /d C:\\\\Users\\\\user\\\\Herd\\\\web-monitoring && php artisan migrate:status\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\user\\\\Herd\\\\web-monitoring && php artisan migrate:status 2>&1\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\user\\\\Herd\\\\web-monitoring && php artisan tinker --execute=\"\"echo json_encode\\(DB::select\\(''PRAGMA table_info\\(monitoring_results\\)''\\)\\);\"\"\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\user\\\\Herd\\\\web-monitoring && php artisan tinker --execute=\"\"print_r\\(DB::select\\(''PRAGMA table_info\\(monitoring_results\\)''\\)\\);\"\"\")"
     ]
   }
 }

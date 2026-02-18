@@ -99,10 +99,10 @@ class MonitoringResultResource extends Resource
                     ->getStateUsing(fn($record) => (bool) ($record->scan_results['any_significant_change'] ?? false))
                     ->trueColor('danger')
                     ->falseColor('success'),
-                Tables\Columns\IconColumn::make('scan_results.has_broken_assets')
+                Tables\Columns\IconColumn::make('scan_results.broken_assets')
                     ->boolean()
                     ->label('Has Broken Assets')
-                    ->getStateUsing(fn($record) => (bool) ($record->scan_results['has_broken_assets'] ?? false))
+                    ->getStateUsing(fn($record) => (bool) ($record->scan_results['broken_assets'] ?? false))
                     ->trueColor('danger')
                     ->falseColor('success'),
                 Tables\Columns\ImageColumn::make('screenshot_path')
