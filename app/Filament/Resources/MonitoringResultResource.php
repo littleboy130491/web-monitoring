@@ -104,6 +104,51 @@ class MonitoringResultResource extends Resource
                     ->visibility('public')
                     ->url(fn($record): string => ($record->screenshot_path ? Storage::url($record->screenshot_path) : ''))
                     ->openUrlInNewTab(),
+                Tables\Columns\TextColumn::make('scan_results')
+                    ->label('Scan')
+                    ->formatStateUsing(function ($state, $record): string {
+                        if (empty($state)) {
+                            return '—';
+                        }
+                        $data = is_array($state) ? $state : json_decode($state, true);
+                        if (!$data) return '—';
+
+                        $pages = $data['pages'] ?? [];
+                        $broken = count($data['broken_assets'] ?? []);
+                        $changed = collect($pages)->where('significant', true)->count();
+
+                        $parts = [];
+                        if ($changed > 0) {
+                            $parts[] = "{$changed} page(s) changed";
+                        }
+                        if ($broken > 0) {
+                            $parts[] = "{$broken} broken asset(s)";
+                        }
+                        return $parts ? implode(', ', $parts) : count($pages) . ' page(s) OK';
+                    })
+                    ->color(function ($state, $record): string {
+                        if (empty($state)) return 'gray';
+                        $data = is_array($state) ? $state : json_decode($state, true);
+                        if (!$data) return 'gray';
+                        if ($data['any_significant_change'] ?? false) return 'warning';
+                        if ($data['has_broken_assets'] ?? false) return 'warning';
+                        return 'success';
+                    })
+                    ->badge()
+                    ->tooltip(function ($state, $record): ?string {
+                        if (empty($state)) return null;
+                        $data = is_array($state) ? $state : json_decode($state, true);
+                        if (!$data) return null;
+                        $lines = [];
+                        foreach ($data['pages'] ?? [] as $page) {
+                            $flag = $page['significant'] ? ' ⚠' : '';
+                            $lines[] = "/{$page['slug']}: {$page['change_percent']}%{$flag}";
+                        }
+                        foreach ($data['broken_assets'] ?? [] as $asset) {
+                            $lines[] = "404: {$asset['url']}";
+                        }
+                        return implode("\n", $lines);
+                    }),
                 Tables\Columns\TextColumn::make('domain_days_until_expiry')
                     ->label('Domain Expiry')
                     ->sortable()
@@ -158,6 +203,14 @@ class MonitoringResultResource extends Resource
                 Tables\Filters\Filter::make('last_24_hours')
                     ->query(fn(Builder $query): Builder => $query->where('checked_at', '>=', now()->subDay()))
                     ->label('Last 24 Hours'),
+                Tables\Filters\Filter::make('has_broken_assets')
+                    ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
+                        ->whereRaw("json_extract(scan_results, '$.has_broken_assets') = 1"))
+                    ->label('Has Broken Assets'),
+                Tables\Filters\Filter::make('content_scan_changed')
+                    ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
+                        ->whereRaw("json_extract(scan_results, '$.any_significant_change') = 1"))
+                    ->label('Significant Content Change'),
                 Tables\Filters\Filter::make('domain_expiring_soon')
                     ->query(fn(Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 7))
                     ->label('Domain Expiring ≤7 Days'),

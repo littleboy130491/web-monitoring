@@ -84,6 +84,46 @@ class ViewMonitoringResult extends ViewRecord
                     ->visible(fn($record) => !empty($record->screenshot_path))
                     ->collapsible(),
 
+                Components\Section::make('Deep Scan Results')
+                    ->schema([
+                        Components\TextEntry::make('scan_results')
+                            ->label('Page Snapshots')
+                            ->formatStateUsing(function ($state) {
+                                if (empty($state)) return 'No scan data available.';
+                                $data = is_array($state) ? $state : json_decode($state, true);
+                                if (!$data) return 'No scan data available.';
+
+                                $rows = '';
+                                foreach ($data['pages'] ?? [] as $page) {
+                                    $badge = $page['significant']
+                                        ? '<span style="color:#ef4444;font-weight:bold"> ⚠ SIGNIFICANT</span>'
+                                        : '<span style="color:#22c55e"> ✓ OK</span>';
+                                    $prev = $page['previous_file_found'] ? '' : ' <em>(first scan)</em>';
+                                    $rows .= "<div class='mb-1'>"
+                                        . "<strong>" . e($page['slug']) . "</strong> — "
+                                        . e($page['change_percent']) . "% changed"
+                                        . $badge . $prev
+                                        . "</div>";
+                                }
+
+                                $broken = $data['broken_assets'] ?? [];
+                                if ($broken) {
+                                    $rows .= "<div class='mt-3'><strong style='color:#f59e0b'>Broken Assets (" . count($broken) . "):</strong></div>";
+                                    foreach ($broken as $asset) {
+                                        $rows .= "<div class='ml-2 text-sm' style='color:#ef4444'>"
+                                            . e($asset['type']) . " 404: " . e($asset['url'])
+                                            . "</div>";
+                                    }
+                                }
+
+                                return "<div class='space-y-1 text-sm font-mono'>{$rows}</div>";
+                            })
+                            ->html()
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn ($record) => !empty($record->scan_results))
+                    ->collapsible(),
+
                 Components\Section::make('Domain Expiry')
                     ->schema([
                         Components\TextEntry::make('domain_expires_at')

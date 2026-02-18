@@ -8,10 +8,20 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Spatie\Browsershot\Browsershot;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class WebsiteMonitoringService
 {
     private Client $client;
+
+    /** Change threshold (%) above which a page is considered significantly changed */
+    private const CHANGE_THRESHOLD = 10.0;
+
+    /** Max same-domain CSS/JS assets to HEAD-check per page */
+    private const MAX_ASSET_CHECKS = 20;
+
+    /** Max text size (bytes) passed to similar_text to keep it fast */
+    private const MAX_DIFF_BYTES = 51200; // 50 KB
 
     public function __construct()
     {
@@ -41,11 +51,8 @@ class WebsiteMonitoringService
             $result['status_code'] = $response->getStatusCode();
             $result['headers'] = json_encode($response->getHeaders());
 
-            $content = $response->getBody()->getContents();
-            $result['content_hash'] = hash('sha256', $content);
-
-            // Check if content changed
-            $result['content_changed'] = $this->checkContentChanged($website, $result['content_hash']);
+            $html = $response->getBody()->getContents();
+            $result['content_hash'] = hash('sha256', $html);
 
             // Determine status
             $result['status'] = $this->determineStatus($response->getStatusCode());
@@ -63,6 +70,11 @@ class WebsiteMonitoringService
             $domainInfo = $this->getDomainInfo($website->url);
             $result['domain_expires_at'] = $domainInfo['domain_expires_at'];
             $result['domain_days_until_expiry'] = $domainInfo['domain_days_until_expiry'];
+
+            // Deep scan: save page text snapshots and diff against previous
+            $scanData = $this->performDeepScan($website, $html);
+            $result['content_changed'] = $scanData['any_significant_change'];
+            $result['scan_results'] = json_encode($scanData);
 
             // Take screenshot if requested and website is up
             if ($takeScreenshot && $result['status'] === 'up') {
@@ -82,9 +94,302 @@ class WebsiteMonitoringService
         return MonitoringResult::create($result);
     }
 
+    // -------------------------------------------------------------------------
+    // Deep scan
+    // -------------------------------------------------------------------------
+
     /**
-     * Initialize the result array with default values
+     * Perform a deep scan: save text snapshots of the main page and up to 3 nav
+     * pages, diff each against its previous snapshot, and check for broken assets.
      */
+    private function performDeepScan(Website $website, string $mainHtml): array
+    {
+        $websiteSlug = $this->websiteSlug($website->url);
+        $pages = [];
+
+        // --- Main page ---
+        $pages[] = $this->scanPage('home', $websiteSlug, $mainHtml, $website->url);
+
+        // --- First 3 <nav> links (same domain) ---
+        $navLinks = $this->extractNavLinks($mainHtml, $website->url);
+        foreach ($navLinks as $navUrl) {
+            try {
+                $navResponse = $this->client->get($navUrl, [
+                    'timeout' => 15,
+                    'http_errors' => false,
+                    'allow_redirects' => true,
+                ]);
+                $navHtml = $navResponse->getBody()->getContents();
+                $pageSlug = $this->pageSlug($navUrl);
+                $pages[] = $this->scanPage($pageSlug, $websiteSlug, $navHtml, $navUrl);
+            } catch (\Exception $e) {
+                Log::warning("Deep scan: failed to fetch nav link {$navUrl}: " . $e->getMessage());
+            }
+        }
+
+        // --- Broken asset detection (same-domain CSS/JS → HEAD check) ---
+        $brokenAssets = $this->checkBrokenAssets($mainHtml, $website->url);
+
+        return [
+            'pages' => $pages,
+            'broken_assets' => $brokenAssets,
+            'any_significant_change' => collect($pages)->contains('significant', true),
+            'has_broken_assets' => count($brokenAssets) > 0,
+            'scanned_at' => now()->toISOString(),
+        ];
+    }
+
+    /**
+     * Strip HTML to visible text, save as a timestamped snapshot, diff against
+     * the most recent previous snapshot for the same page, return result data.
+     */
+    private function scanPage(string $pageSlug, string $websiteSlug, string $html, string $url): array
+    {
+        $text = $this->stripToText($html);
+        $dir = storage_path("app/scans/{$websiteSlug}/{$pageSlug}");
+
+        // Find previous snapshot BEFORE writing the new one
+        $previousFile = $this->findLatestFile($dir);
+
+        // Save current snapshot
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        $filename = now()->format('Y-m-d_H-i-s') . '.txt';
+        file_put_contents("{$dir}/{$filename}", $text);
+
+        // Compare with previous
+        $changePercent = 0.0;
+        $previousFileFound = $previousFile !== null;
+
+        if ($previousFile !== null) {
+            $previousText = file_get_contents($previousFile);
+            $changePercent = $this->diffPercent($previousText, $text);
+        }
+
+        return [
+            'url' => $url,
+            'slug' => $pageSlug,
+            'change_percent' => $changePercent,
+            'significant' => $changePercent > self::CHANGE_THRESHOLD,
+            'previous_file_found' => $previousFileFound,
+            'snapshot' => "scans/{$websiteSlug}/{$pageSlug}/{$filename}",
+        ];
+    }
+
+    /**
+     * Extract first 3 same-domain <a href> elements inside <nav> tags.
+     */
+    private function extractNavLinks(string $html, string $baseUrl): array
+    {
+        $links = [];
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+        $anchors = $xpath->query('//nav//a[@href]');
+        if ($anchors === false) {
+            return [];
+        }
+
+        $baseParsed = parse_url($baseUrl);
+        $baseHost = $baseParsed['host'] ?? '';
+        $baseScheme = $baseParsed['scheme'] ?? 'https';
+
+        foreach ($anchors as $anchor) {
+            if (count($links) >= 3) {
+                break;
+            }
+
+            $href = trim($anchor->getAttribute('href'));
+
+            // Skip non-navigable links
+            if (empty($href)
+                || str_starts_with($href, '#')
+                || str_starts_with($href, 'javascript:')
+                || str_starts_with($href, 'mailto:')
+                || str_starts_with($href, 'tel:')
+            ) {
+                continue;
+            }
+
+            // Resolve to absolute URL
+            if (str_starts_with($href, '//')) {
+                $href = $baseScheme . ':' . $href;
+            } elseif (str_starts_with($href, '/')) {
+                $href = $baseScheme . '://' . $baseHost . $href;
+            } elseif (!str_starts_with($href, 'http')) {
+                continue;
+            }
+
+            // Same domain only
+            $linkHost = parse_url($href, PHP_URL_HOST);
+            if ($linkHost !== $baseHost) {
+                continue;
+            }
+
+            // No duplicates, no self-link
+            $normalized = rtrim($href, '/');
+            $normalizedBase = rtrim($baseUrl, '/');
+            if ($normalized === $normalizedBase || in_array($href, $links)) {
+                continue;
+            }
+
+            $links[] = $href;
+        }
+
+        return $links;
+    }
+
+    /**
+     * HEAD-check all same-domain stylesheets and scripts on the page.
+     * Returns an array of assets that returned HTTP 404.
+     */
+    private function checkBrokenAssets(string $html, string $baseUrl): array
+    {
+        $broken = [];
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $baseHost = parse_url($baseUrl, PHP_URL_HOST);
+        $baseScheme = parse_url($baseUrl, PHP_URL_SCHEME) ?? 'https';
+
+        $assetsToCheck = [];
+
+        // Collect <link rel="stylesheet">
+        foreach ($dom->getElementsByTagName('link') as $link) {
+            if (strtolower($link->getAttribute('rel')) !== 'stylesheet') {
+                continue;
+            }
+            $href = $this->resolveAssetUrl($link->getAttribute('href'), $baseScheme, $baseHost);
+            if ($href && parse_url($href, PHP_URL_HOST) === $baseHost) {
+                $assetsToCheck[] = ['url' => $href, 'type' => 'css'];
+            }
+        }
+
+        // Collect <script src>
+        foreach ($dom->getElementsByTagName('script') as $script) {
+            $src = $this->resolveAssetUrl($script->getAttribute('src'), $baseScheme, $baseHost);
+            if ($src && parse_url($src, PHP_URL_HOST) === $baseHost) {
+                $assetsToCheck[] = ['url' => $src, 'type' => 'js'];
+            }
+        }
+
+        foreach (array_slice($assetsToCheck, 0, self::MAX_ASSET_CHECKS) as $asset) {
+            try {
+                $response = $this->client->head($asset['url'], [
+                    'timeout' => 5,
+                    'http_errors' => false,
+                    'verify' => false,
+                ]);
+                if ($response->getStatusCode() === 404) {
+                    $broken[] = [
+                        'url' => $asset['url'],
+                        'type' => $asset['type'],
+                        'status' => 404,
+                    ];
+                }
+            } catch (\Exception $e) {
+                // Skip — asset may just be slow
+            }
+        }
+
+        return $broken;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /** Strip HTML to visible plain text */
+    private function stripToText(string $html): string
+    {
+        // Remove <script> and <style> blocks entirely
+        $html = preg_replace('/<script\b[^>]*>[\s\S]*?<\/script>/i', '', $html);
+        $html = preg_replace('/<style\b[^>]*>[\s\S]*?<\/style>/i', '', $html);
+        $text = strip_tags($html);
+        // Collapse whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        return trim($text);
+    }
+
+    /**
+     * Calculate the percentage of content that changed between two texts.
+     * 0 = identical, 100 = completely different.
+     */
+    private function diffPercent(string $old, string $new): float
+    {
+        if ($old === $new) {
+            return 0.0;
+        }
+
+        // Limit size to keep similar_text fast
+        $old = substr($old, 0, self::MAX_DIFF_BYTES);
+        $new = substr($new, 0, self::MAX_DIFF_BYTES);
+
+        similar_text($old, $new, $similarity);
+        return round(100.0 - $similarity, 2);
+    }
+
+    /** Find the most recently created .txt file in a directory, or null. */
+    private function findLatestFile(string $directory): ?string
+    {
+        if (!is_dir($directory)) {
+            return null;
+        }
+        $files = glob($directory . '/*.txt');
+        if (empty($files)) {
+            return null;
+        }
+        sort($files); // datetime-prefixed filenames sort chronologically
+        return end($files) ?: null;
+    }
+
+    /** Derive a filesystem-safe slug from a website's hostname. */
+    private function websiteSlug(string $url): string
+    {
+        $host = parse_url($url, PHP_URL_HOST) ?? $url;
+        $host = preg_replace('/^www\./', '', $host);
+        return Str::slug($host);
+    }
+
+    /** Derive a filesystem-safe slug from a page URL path. */
+    private function pageSlug(string $url): string
+    {
+        $path = trim(parse_url($url, PHP_URL_PATH) ?? '/', '/');
+        if ($path === '' || $path === '/') {
+            return 'home';
+        }
+        return Str::slug(str_replace('/', '-', $path)) ?: 'home';
+    }
+
+    /** Resolve a potentially relative asset URL to an absolute one. */
+    private function resolveAssetUrl(string $href, string $scheme, string $host): ?string
+    {
+        $href = trim($href);
+        if (empty($href)) {
+            return null;
+        }
+        if (str_starts_with($href, '//')) {
+            return $scheme . ':' . $href;
+        }
+        if (str_starts_with($href, '/')) {
+            return $scheme . '://' . $host . $href;
+        }
+        if (str_starts_with($href, 'http')) {
+            return $href;
+        }
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Existing methods (unchanged)
+    // -------------------------------------------------------------------------
+
     private function initializeResult(Website $website): array
     {
         return [
@@ -98,24 +403,13 @@ class WebsiteMonitoringService
             'ssl_info' => null,
             'domain_expires_at' => null,
             'domain_days_until_expiry' => null,
+            'scan_results' => null,
             'content_hash' => null,
             'content_changed' => false,
             'screenshot_path' => null,
         ];
     }
 
-    /**
-     * Check if content has changed from the last monitoring result
-     */
-    private function checkContentChanged(Website $website, string $contentHash): bool
-    {
-        $lastResult = $website->monitoringResults()->latest()->first();
-        return $lastResult && $lastResult->content_hash !== $contentHash;
-    }
-
-    /**
-     * Determine website status based on HTTP status code
-     */
     private function determineStatus(int $statusCode): string
     {
         if ($statusCode >= 200 && $statusCode < 300) {
@@ -127,9 +421,6 @@ class WebsiteMonitoringService
         }
     }
 
-    /**
-     * Get SSL certificate information for HTTPS websites
-     */
     private function getSSLInfo(string $url): ?array
     {
         try {
@@ -172,60 +463,6 @@ class WebsiteMonitoringService
         return null;
     }
 
-    /**
-     * Take a screenshot of the website
-     */
-    private function takeScreenshot(Website $website): ?string
-    {
-        try {
-            $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.jpg';
-            $fullPath = storage_path('app/public/' . $filename);
-
-            // Ensure screenshots directory exists
-            $dir = dirname($fullPath);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-
-            $chromePath = $this->findChromePath();
-            if (!$chromePath) {
-                Log::error('No Chrome or Chromium installation found on system.');
-                return null;
-            }
-
-            Browsershot::url($website->url)
-                ->setChromePath($chromePath)
-                ->noSandbox()
-                ->dismissDialogs()
-                ->windowSize(1280, 720)
-                ->waitUntilNetworkIdle(false)
-                ->timeout(20)
-                ->setOption('no-first-run', true)
-                ->setOption('disable-gpu', true)
-                ->setOption('disable-dev-shm-usage', true)
-                ->setOption('ignore-certificate-errors', true)
-                ->setOption('ignore-ssl-errors', true)
-                ->setScreenshotType('jpeg', quality: 70)
-                ->save($fullPath);
-
-            // Verify the file was created and has content
-            if (file_exists($fullPath) && filesize($fullPath) > 0) {
-                Log::info("Screenshot saved successfully: {$filename} (" . filesize($fullPath) . " bytes)");
-                return $filename;
-            } else {
-                Log::error("Screenshot file was created but is empty: {$filename}");
-                return null;
-            }
-
-        } catch (\Exception $e) {
-            Log::error("Screenshot failed for {$website->url}: " . $e->getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Get domain expiry information via WHOIS
-     */
     private function getDomainInfo(string $url): array
     {
         $result = [
@@ -239,18 +476,15 @@ class WebsiteMonitoringService
                 return $result;
             }
 
-            // Remove port if present
             $host = preg_replace('/:\d+$/', '', $host);
-
-            // Extract registrable domain (strip subdomains)
             $parts = explode('.', $host);
             if (count($parts) < 2) {
                 return $result;
             }
+
             $domain = implode('.', array_slice($parts, -2));
             $tld = strtolower(end($parts));
 
-            // Map of TLDs to their WHOIS servers
             $whoisServers = [
                 'com' => 'whois.verisign-grs.com',
                 'net' => 'whois.verisign-grs.com',
@@ -279,7 +513,6 @@ class WebsiteMonitoringService
 
             $whoisServer = $whoisServers[$tld] ?? null;
 
-            // For unknown TLDs, try IANA to find the WHOIS server
             if (!$whoisServer) {
                 $ianaResponse = $this->queryWhois('whois.iana.org', $tld, 5);
                 if ($ianaResponse && preg_match('/whois:\s+(\S+)/i', $ianaResponse, $m)) {
@@ -296,7 +529,6 @@ class WebsiteMonitoringService
                 return $result;
             }
 
-            // Try multiple common expiry date patterns
             $patterns = [
                 '/Registry Expiry Date:\s*(.+)/i',
                 '/Expiry Date:\s*(.+)/i',
@@ -311,7 +543,6 @@ class WebsiteMonitoringService
             foreach ($patterns as $pattern) {
                 if (preg_match($pattern, $response, $matches)) {
                     $expiryStr = trim($matches[1]);
-                    // Strip timezone info in brackets or extra trailing text
                     $expiryStr = preg_replace('/\s*\(.*\)\s*$/', '', $expiryStr);
                     $expiryStr = trim($expiryStr);
 
@@ -330,9 +561,6 @@ class WebsiteMonitoringService
         return $result;
     }
 
-    /**
-     * Query a WHOIS server and return the raw response
-     */
     private function queryWhois(string $server, string $query, int $timeout = 10): ?string
     {
         $socket = @fsockopen($server, 43, $errno, $errstr, $timeout);
@@ -356,9 +584,52 @@ class WebsiteMonitoringService
         return $response ?: null;
     }
 
-    /**
-     * Find the Chrome executable path
-     */
+    private function takeScreenshot(Website $website): ?string
+    {
+        try {
+            $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.jpg';
+            $fullPath = storage_path('app/public/' . $filename);
+
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+
+            $chromePath = $this->findChromePath();
+            if (!$chromePath) {
+                Log::error('No Chrome or Chromium installation found on system.');
+                return null;
+            }
+
+            Browsershot::url($website->url)
+                ->setChromePath($chromePath)
+                ->noSandbox()
+                ->dismissDialogs()
+                ->windowSize(1280, 720)
+                ->waitUntilNetworkIdle(false)
+                ->timeout(20)
+                ->setOption('no-first-run', true)
+                ->setOption('disable-gpu', true)
+                ->setOption('disable-dev-shm-usage', true)
+                ->setOption('ignore-certificate-errors', true)
+                ->setOption('ignore-ssl-errors', true)
+                ->setScreenshotType('jpeg', quality: 70)
+                ->save($fullPath);
+
+            if (file_exists($fullPath) && filesize($fullPath) > 0) {
+                Log::info("Screenshot saved successfully: {$filename} (" . filesize($fullPath) . " bytes)");
+                return $filename;
+            } else {
+                Log::error("Screenshot file was created but is empty: {$filename}");
+                return null;
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Screenshot failed for {$website->url}: " . $e->getMessage());
+            return null;
+        }
+    }
+
     private function findChromePath(): ?string
     {
         $possiblePaths = [

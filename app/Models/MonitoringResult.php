@@ -20,6 +20,7 @@ class MonitoringResult extends Model
         'ssl_info',
         'domain_expires_at',
         'domain_days_until_expiry',
+        'scan_results',
         'checked_at',
     ];
 
@@ -31,6 +32,7 @@ class MonitoringResult extends Model
         'status_code' => 'integer',
         'response_time' => 'integer',
         'domain_days_until_expiry' => 'integer',
+        'scan_results' => 'array',
     ];
 
     public function website(): BelongsTo

@@ -79,6 +79,12 @@ class MonitorWebsiteJob implements ShouldQueue
             if ($result->domain_days_until_expiry !== null && $result->domain_days_until_expiry <= 7) {
                 $this->sendDomainExpiryNotification($user, $result);
             }
+
+            // Notification for broken assets (e.g. stale Elementor CSS)
+            $scanResults = $result->scan_results;
+            if (!empty($scanResults['broken_assets'])) {
+                $this->sendBrokenAssetsNotification($user, $result, $scanResults['broken_assets']);
+            }
         }
     }
 
@@ -135,6 +141,20 @@ class MonitorWebsiteJob implements ShouldQueue
             ->body("{$this->website->url} is up and screenshot captured successfully")
             ->icon('heroicon-o-camera')
             ->color('success')
+            ->sendToDatabase($user);
+    }
+
+    private function sendBrokenAssetsNotification(User $user, MonitoringResult $result, array $brokenAssets): void
+    {
+        $count = count($brokenAssets);
+        $types = implode(', ', array_unique(array_column($brokenAssets, 'type')));
+        $sample = $brokenAssets[0]['url'] ?? '';
+
+        Notification::make()
+            ->title('Broken Assets Detected')
+            ->body("{$this->website->url} has {$count} broken asset(s) returning 404 ({$types}). e.g. {$sample}")
+            ->icon('heroicon-o-exclamation-triangle')
+            ->color('warning')
             ->sendToDatabase($user);
     }
 
