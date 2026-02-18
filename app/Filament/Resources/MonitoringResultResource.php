@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\MonitoringResultResource\Pages;
-use App\Filament\Resources\MonitoringResultResource\RelationManagers;
 use App\Models\MonitoringResult;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,7 +10,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Storage;
 
 class MonitoringResultResource extends Resource
@@ -115,7 +113,7 @@ class MonitoringResultResource extends Resource
                     ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('scan_results')
                     ->label('Scan')
-                    ->formatStateUsing(function ($state, $record): string {
+                    ->formatStateUsing(function ($state): string {
                         if (empty($state)) {
                             return '—';
                         }
@@ -135,7 +133,7 @@ class MonitoringResultResource extends Resource
                         }
                         return $parts ? implode(', ', $parts) : count($pages) . ' page(s) OK';
                     })
-                    ->color(function ($state, $record): string {
+                    ->color(function ($state): string {
                         if (empty($state)) return 'gray';
                         $data = is_array($state) ? $state : json_decode($state, true);
                         if (!$data) return 'gray';
@@ -144,7 +142,7 @@ class MonitoringResultResource extends Resource
                         return 'success';
                     })
                     ->badge()
-                    ->tooltip(function ($state, $record): ?string {
+                    ->tooltip(function ($state): ?string {
                         if (empty($state)) return null;
                         $data = is_array($state) ? $state : json_decode($state, true);
                         if (!$data) return null;
@@ -247,7 +245,7 @@ class MonitoringResultResource extends Resource
         return false;
     }
 
-    public static function canEdit($record): bool
+    public static function canEdit($_record): bool
     {
         return false;
     }
