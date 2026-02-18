@@ -74,7 +74,7 @@ class WebsiteMonitoringService
             // Deep scan: save page text snapshots and diff against previous
             $scanData = $this->performDeepScan($website, $html);
             $result['content_changed'] = $scanData['any_significant_change'];
-            $result['scan_results'] = json_encode($scanData);
+            $result['scan_results'] = $scanData;
 
             // Take screenshot if requested and website is up
             if ($takeScreenshot && $result['status'] === 'up') {
