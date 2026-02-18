@@ -118,7 +118,7 @@ class MonitoringResultResource extends Resource
                         if (empty($data)) return '—';
                         $broken = count($data['broken_assets'] ?? []);
                         if ($broken > 0) return "{$broken} broken asset(s)";
-                        return count($data['pages'] ?? []) . ' page(s) OK';
+                        return 'OK';
                     })
                     ->color(function ($record): string {
                         $data = $record->scan_results;
