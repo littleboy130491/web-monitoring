@@ -11,3 +11,8 @@ Artisan::command('inspire', function () {
 // Schedule monitoring tasks
 Schedule::command('monitor:websites --screenshot')->twiceDaily(12, 0)->withoutOverlapping();
 Schedule::command('monitor:prune')->daily();
+
+// Auto-prune monitoring reports older than 30 days
+Schedule::call(function () {
+    \App\Models\MonitoringReport::where('created_at', '<', now()->subDays(30))->delete();
+})->daily()->name('prune-monitoring-reports')->withoutOverlapping();

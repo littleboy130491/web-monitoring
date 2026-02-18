@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\Website;
+use App\Services\MonitoringReportService;
 use App\Services\WebsiteMonitoringService;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
 
 class MonitorWebsites extends Command
 {
@@ -15,12 +17,11 @@ class MonitorWebsites extends Command
 
     protected $description = 'Monitor websites for status, health, content changes, and take screenshots';
 
-    private WebsiteMonitoringService $monitoringService;
-
-    public function __construct(WebsiteMonitoringService $monitoringService)
-    {
+    public function __construct(
+        private WebsiteMonitoringService $monitoringService,
+        private MonitoringReportService $reportService,
+    ) {
         parent::__construct();
-        $this->monitoringService = $monitoringService;
     }
 
     public function handle(): int
@@ -39,12 +40,15 @@ class MonitorWebsites extends Command
         $bar = $this->output->createProgressBar($websites->count());
         $bar->start();
 
+        $results = new Collection();
+
         foreach ($websites as $website) {
             $result = $this->monitoringService->monitor(
                 $website,
                 (int) $this->option('timeout'),
                 $this->option('screenshot')
             );
+            $results->push($result);
             $this->displayResult($website, $result->toArray());
             $bar->advance();
         }
@@ -52,6 +56,18 @@ class MonitorWebsites extends Command
         $bar->finish();
         $this->newLine();
         $this->info('Website monitoring completed!');
+
+        // Generate and send email report
+        $this->info('Sending monitoring report...');
+        $report = $this->reportService->generateAndSend($results, 'command');
+
+        if ($report === null) {
+            $this->warn('Report skipped: REPORT_RECIPIENT_EMAIL is not configured.');
+        } elseif ($report->isSent()) {
+            $this->info("Report sent to {$report->recipient}.");
+        } else {
+            $this->error("Report failed to send: {$report->error_message}");
+        }
 
         return Command::SUCCESS;
     }

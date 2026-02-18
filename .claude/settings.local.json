@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan:*)",
+      "Bash(where:*)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" artisan make:migration add_domain_expiry_to_monitoring_results_table)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" artisan migrate)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Services/WebsiteMonitoringService.php)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Jobs/MonitorWebsiteJob.php)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Models/MonitoringResult.php)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Filament/Resources/MonitoringResultResource.php)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Filament/Resources/MonitoringResultResource/Pages/ViewMonitoringResult.php)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" artisan make:migration add_scan_results_to_monitoring_results_table)",
+      "Bash(for f in app/Services/WebsiteMonitoringService.php app/Jobs/MonitorWebsiteJob.php app/Models/MonitoringResult.php app/Filament/Resources/MonitoringResultResource.php app/Filament/Resources/MonitoringResultResource/Pages/ViewMonitoringResult.php)",
+      "Bash(do \"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l $f)",
+      "Bash(done)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Console/Commands/MonitorWebsites.php)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -l app/Console/Commands/PruneMonitoringData.php)",
+      "Bash(for f in app/Services/MonitoringPruneService.php app/Console/Commands/PruneMonitoringData.php app/Filament/Resources/MonitoringResultResource/Pages/ListMonitoringResults.php)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" -r \"echo json_encode\\(json_decode\\(file_get_contents\\(''composer.json''\\)\\)->require, JSON_PRETTY_PRINT\\);\")",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" \"C:\\\\Users\\\\user\\\\Herd\\\\web-monitoring\\\\vendor\\\\bin\\\\composer\" require:*)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\composer.bat\" require symfony/mailgun-mailer)",
+      "Bash(\"C:\\\\Users\\\\user\\\\.config\\\\herd\\\\bin\\\\php.bat\" artisan make:migration create_monitoring_reports_table)",
+      "Bash(for f in app/Models/MonitoringReport.php app/Mail/MonitoringReportMail.php app/Services/MonitoringReportService.php app/Console/Commands/MonitorWebsites.php app/Filament/Resources/MonitoringReportResource.php app/Filament/Resources/MonitoringReportResource/Pages/ListMonitoringReports.php app/Filament/Resources/MonitoringReportResource/Pages/ViewMonitoringReport.php config/monitoring.php)"
+    ]
+  }
+}
