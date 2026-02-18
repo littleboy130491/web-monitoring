@@ -140,7 +140,7 @@ class MonitoringResultResource extends Resource
                         $data = is_array($state) ? $state : json_decode($state, true);
                         if (!$data) return 'gray';
                         if ($data['any_significant_change'] ?? false) return 'warning';
-                        if ($data['has_broken_assets'] ?? false) return 'warning';
+                        if (!empty($data['broken_assets'])) return 'warning';
                         return 'success';
                     })
                     ->badge()
@@ -211,7 +211,7 @@ class MonitoringResultResource extends Resource
                     ->label('Last 24 Hours'),
                 Tables\Filters\Filter::make('has_broken_assets')
                     ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
-                        ->whereRaw("json_extract(scan_results, '$.has_broken_assets') = 1"))
+                        ->whereRaw("json_array_length(json_extract(scan_results, '$.broken_assets')) > 0"))
                     ->label('Has Broken Assets'),
                 Tables\Filters\Filter::make('content_scan_changed')
                     ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
