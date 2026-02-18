@@ -39,19 +39,19 @@ class ViewMonitoringReport extends ViewRecord
 
             Components\Section::make('Issues Summary')
                 ->schema([
-                    Components\TextEntry::make('summary')
+                    Components\TextEntry::make('summary_display')
                         ->label('')
-                        ->formatStateUsing(function ($state) {
-                            $data = is_array($state) ? $state : json_decode($state, true);
+                        ->state(function ($record): string {
+                            $data = $record->summary ?? [];
                             if (!$data) return 'No data.';
 
                             $html = '<div style="font-size:13px;line-height:1.8">';
 
                             $sections = [
-                                'down'           => ['label' => '🔴 Sites Down',              'color' => '#dc2626'],
-                                'expiring'       => ['label' => '⏰ Domain Expiring ≤7 Days',  'color' => '#d97706'],
-                                'contentChanged' => ['label' => '📄 Significant Content Change','color' => '#d97706'],
-                                'brokenAssets'   => ['label' => '🔗 Broken Assets (404)',       'color' => '#d97706'],
+                                'down'           => ['label' => '🔴 Sites Down',               'color' => '#dc2626'],
+                                'expiring'       => ['label' => '⏰ Domain Expiring ≤7 Days',   'color' => '#d97706'],
+                                'contentChanged' => ['label' => '📄 Significant Content Change', 'color' => '#d97706'],
+                                'brokenAssets'   => ['label' => '🔗 Broken Assets (404)',        'color' => '#d97706'],
                             ];
 
                             foreach ($sections as $key => $meta) {
@@ -61,16 +61,16 @@ class ViewMonitoringReport extends ViewRecord
                                 $html .= "<strong style='color:{$meta['color']}'>{$meta['label']} (" . count($items) . ")</strong><ul style='margin:4px 0 0 16px'>";
                                 foreach ($items as $item) {
                                     $url = e($item['url']);
-                                    $detail = match($key) {
-                                        'down'           => " — HTTP " . e($item['status_code'] ?? '?') . (isset($item['error']) ? ': ' . e($item['error']) : ''),
-                                        'expiring'       => " — expires " . e($item['expires_at']) . " ({$item['days']}d)",
-                                        'contentChanged' => " — " . implode(', ', array_map(fn($p) => e($p['slug']).': '.e($p['change_percent']).'%', $item['pages'])),
-                                        'brokenAssets'   => " — " . count($item['assets']) . " broken file(s)",
-                                        default => '',
+                                    $detail = match ($key) {
+                                        'down'           => ' — HTTP ' . e($item['status_code'] ?? '?') . (isset($item['error']) ? ': ' . e($item['error']) : ''),
+                                        'expiring'       => ' — expires ' . e($item['expires_at']) . " ({$item['days']}d)",
+                                        'contentChanged' => ' — ' . implode(', ', array_map(fn($p) => e($p['slug']) . ': ' . e($p['change_percent']) . '%', $item['pages'])),
+                                        'brokenAssets'   => ' — ' . count($item['assets']) . ' broken file(s)',
+                                        default          => '',
                                     };
                                     $html .= "<li><a href='{$url}' style='color:#2563eb'>{$url}</a>{$detail}</li>";
                                 }
-                                $html .= "</ul></div>";
+                                $html .= '</ul></div>';
                             }
 
                             $html .= '</div>';
