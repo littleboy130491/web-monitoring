@@ -508,7 +508,7 @@ class WebsiteMonitoringService
                 'info' => 'whois.afilias.net',
                 'biz'  => 'whois.biz',
                 'io'   => 'whois.nic.io',
-                'co'   => 'whois.nic.co',
+                'co'   => 'whois.registry.co',
                 'us'   => 'whois.nic.us',
                 'uk'   => 'whois.nic.uk',
                 'au'   => 'whois.auda.org.au',
