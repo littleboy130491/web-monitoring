@@ -86,6 +86,7 @@ class ViewMonitoringReport extends ViewRecord
                     Components\ViewEntry::make('body_html')
                         ->label('')
                         ->view('filament.infolists.email-preview')
+                        ->viewData(fn($record) => ['bodyHtml' => $record->body_html])
                         ->columnSpanFull(),
                 ])
                 ->collapsible()
