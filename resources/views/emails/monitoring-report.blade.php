@@ -44,8 +44,8 @@
       $summary = $report->summary;
       $down           = $summary['down'] ?? [];
       $expiring       = $summary['expiring'] ?? [];
-      $contentChanged = $summary['content_changed'] ?? [];
-      $brokenAssets   = $summary['broken_assets'] ?? [];
+      $contentChanged = $summary['content_changed'] ?? ($summary['contentChanged'] ?? []);
+      $brokenAssets   = $summary['broken_assets'] ?? ($summary['brokenAssets'] ?? []);
       $total = count($down) + count($expiring) + count($contentChanged) + count($brokenAssets);
     @endphp
 
@@ -104,7 +104,7 @@
           <tr>
             <td><a href="{{ $item['url'] }}">{{ $item['url'] }}</a></td>
             <td>
-              @foreach($item['pages'] as $page)
+              @foreach(($item['pages'] ?? []) as $page)
                 <div>{{ $page['slug'] }}: <strong>{{ $page['change_percent'] }}%</strong></div>
               @endforeach
             </td>
@@ -124,7 +124,7 @@
           <tr>
             <td><a href="{{ $item['url'] }}">{{ $item['url'] }}</a></td>
             <td>
-              @foreach($item['assets'] as $asset)
+              @foreach(($item['assets'] ?? []) as $asset)
                 <div class="badge badge-red">{{ strtoupper($asset['type']) }}</div>
                 <span style="font-size:11px;color:#64748b;word-break:break-all"> {{ $asset['url'] }}</span><br>
               @endforeach

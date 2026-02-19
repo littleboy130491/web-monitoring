@@ -43,13 +43,31 @@ class MonitoringReportService
             }
 
             // Significant content change (any page > 10%)
-            $scan = $result->scan_results;
-            if (!empty($scan['any_significant_change'])) {
-                $changedPages = collect($scan['pages'] ?? [])
+            $scan = is_array($result->scan_results)
+                ? $result->scan_results
+                : (json_decode((string) ($result->scan_results ?? '[]'), true) ?: []);
+
+            $hasSignificantChange = (bool) ($scan['any_significant_change'] ?? $result->content_changed ?? false);
+            if ($hasSignificantChange) {
+                $pages = collect($scan['pages'] ?? []);
+                $changedPages = $pages
                     ->where('significant', true)
                     ->map(fn($p) => ['slug' => $p['slug'], 'change_percent' => $p['change_percent']])
                     ->values()
                     ->all();
+
+                if (empty($changedPages) && $pages->isNotEmpty()) {
+                    $topPage = $pages
+                        ->sortByDesc(fn($p) => (float) ($p['change_percent'] ?? 0))
+                        ->first();
+
+                    if ($topPage) {
+                        $changedPages[] = [
+                            'slug' => $topPage['slug'] ?? 'home',
+                            'change_percent' => $topPage['change_percent'] ?? 0,
+                        ];
+                    }
+                }
 
                 if ($changedPages) {
                     $contentChanged[] = [
@@ -60,10 +78,19 @@ class MonitoringReportService
             }
 
             // Broken assets (404 CSS/JS)
-            if (!empty($scan['broken_assets'])) {
+            $assets = $scan['broken_assets'] ?? [];
+            $hasBrokenAssets = !empty($assets) || !empty($scan['has_broken_assets']);
+            if ($hasBrokenAssets) {
+                if (empty($assets)) {
+                    $assets = [[
+                        'type' => 'unknown',
+                        'url' => '(detected, details unavailable)',
+                    ]];
+                }
+
                 $brokenAssets[] = [
                     'url'    => $result->website->url,
-                    'assets' => $scan['broken_assets'],
+                    'assets' => $assets,
                 ];
             }
         }
@@ -84,8 +111,12 @@ class MonitoringReportService
         $parts = [];
         if (count($summary['down']))           $parts[] = count($summary['down']) . ' down';
         if (count($summary['expiring']))       $parts[] = count($summary['expiring']) . ' expiring';
-        if (count($summary['contentChanged'])) $parts[] = count($summary['contentChanged']) . ' changed';
-        if (count($summary['brokenAssets']))   $parts[] = count($summary['brokenAssets']) . ' broken assets';
+        if (count($summary['content_changed'] ?? $summary['contentChanged'] ?? [])) {
+            $parts[] = count($summary['content_changed'] ?? $summary['contentChanged'] ?? []) . ' changed';
+        }
+        if (count($summary['broken_assets'] ?? $summary['brokenAssets'] ?? [])) {
+            $parts[] = count($summary['broken_assets'] ?? $summary['brokenAssets'] ?? []) . ' broken assets';
+        }
 
         $issues = $parts ? '[' . implode(', ', $parts) . ']' : '[All Clear]';
         return "Monitoring Report {$issues} – " . now()->format('Y-m-d H:i');

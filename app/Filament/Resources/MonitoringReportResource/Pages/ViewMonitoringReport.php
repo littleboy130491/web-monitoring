@@ -44,14 +44,16 @@ class ViewMonitoringReport extends ViewRecord
                         ->state(function ($record): string {
                             $data = $record->summary ?? [];
                             if (!$data) return 'No data.';
+                            $data['content_changed'] = $data['content_changed'] ?? ($data['contentChanged'] ?? []);
+                            $data['broken_assets'] = $data['broken_assets'] ?? ($data['brokenAssets'] ?? []);
 
                             $html = '<div style="font-size:13px;line-height:1.8">';
 
                             $sections = [
                                 'down'           => ['label' => '🔴 Sites Down',               'color' => '#dc2626'],
                                 'expiring'       => ['label' => '⏰ Domain Expiring ≤7 Days',   'color' => '#d97706'],
-                                'contentChanged' => ['label' => '📄 Significant Content Change', 'color' => '#d97706'],
-                                'brokenAssets'   => ['label' => '🔗 Broken Assets (404)',        'color' => '#d97706'],
+                                'content_changed' => ['label' => '📄 Significant Content Change', 'color' => '#d97706'],
+                                'broken_assets'   => ['label' => '🔗 Broken Assets (404)',        'color' => '#d97706'],
                             ];
 
                             foreach ($sections as $key => $meta) {
@@ -64,8 +66,8 @@ class ViewMonitoringReport extends ViewRecord
                                     $detail = match ($key) {
                                         'down'           => ' — HTTP ' . e($item['status_code'] ?? '?') . (isset($item['error']) ? ': ' . e($item['error']) : ''),
                                         'expiring'       => ' — expires ' . e($item['expires_at']) . " ({$item['days']}d)",
-                                        'contentChanged' => ' — ' . implode(', ', array_map(fn($p) => e($p['slug']) . ': ' . e($p['change_percent']) . '%', $item['pages'])),
-                                        'brokenAssets'   => ' — ' . count($item['assets']) . ' broken file(s)',
+                                        'content_changed' => ' — ' . implode(', ', array_map(fn($p) => e($p['slug']) . ': ' . e($p['change_percent']) . '%', $item['pages'] ?? [])),
+                                        'broken_assets'   => ' — ' . count($item['assets'] ?? []) . ' broken file(s)',
                                         default          => '',
                                     };
                                     $html .= "<li><a href='{$url}' style='color:#2563eb'>{$url}</a>{$detail}</li>";

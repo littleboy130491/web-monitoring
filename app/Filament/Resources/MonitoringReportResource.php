@@ -61,18 +61,22 @@ class MonitoringReportResource extends Resource
                     ->formatStateUsing(function ($state): string {
                         if (empty($state)) return '—';
                         $data = is_array($state) ? $state : json_decode($state, true);
+                        $contentChanged = $data['content_changed'] ?? ($data['contentChanged'] ?? []);
+                        $brokenAssets = $data['broken_assets'] ?? ($data['brokenAssets'] ?? []);
                         $parts = [];
                         if ($c = count($data['down'] ?? []))           $parts[] = "{$c} down";
                         if ($c = count($data['expiring'] ?? []))       $parts[] = "{$c} expiring";
-                        if ($c = count($data['contentChanged'] ?? [])) $parts[] = "{$c} changed";
-                        if ($c = count($data['brokenAssets'] ?? []))   $parts[] = "{$c} broken";
+                        if ($c = count($contentChanged))               $parts[] = "{$c} changed";
+                        if ($c = count($brokenAssets))                 $parts[] = "{$c} broken";
                         return $parts ? implode(' · ', $parts) : 'All clear';
                     })
                     ->color(function ($state): string {
                         if (empty($state)) return 'gray';
                         $data = is_array($state) ? $state : json_decode($state, true);
+                        $contentChanged = $data['content_changed'] ?? ($data['contentChanged'] ?? []);
+                        $brokenAssets = $data['broken_assets'] ?? ($data['brokenAssets'] ?? []);
                         $hasIssues = count($data['down'] ?? []) + count($data['expiring'] ?? [])
-                            + count($data['contentChanged'] ?? []) + count($data['brokenAssets'] ?? []);
+                            + count($contentChanged) + count($brokenAssets);
                         return $hasIssues ? 'warning' : 'success';
                     })
                     ->badge(),
