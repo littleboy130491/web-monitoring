@@ -68,7 +68,12 @@ class MonitoringReportService
             }
         }
 
-        return compact('down', 'expiring', 'contentChanged', 'brokenAssets');
+        return [
+            'down'            => $down,
+            'expiring'        => $expiring,
+            'content_changed' => $contentChanged,
+            'broken_assets'   => $brokenAssets,
+        ];
     }
 
     /**
