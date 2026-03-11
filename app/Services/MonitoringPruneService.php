@@ -14,7 +14,9 @@ class MonitoringPruneService
      */
     public function getOldRecords(Carbon $cutoffDate): Collection
     {
-        return MonitoringResult::where('created_at', '<', $cutoffDate)->get();
+        return MonitoringResult::with('website')
+            ->where('created_at', '<', $cutoffDate)
+            ->get();
     }
 
     /**
@@ -52,8 +54,9 @@ class MonitoringPruneService
 
         $cutoffTimestamp = $cutoffDate->timestamp;
         $old = [];
+        $files = glob($scansDir . '/*/*/*.txt') ?: [];
 
-        foreach (glob($scansDir . '/*/*/*.txt') as $file) {
+        foreach ($files as $file) {
             if (filemtime($file) < $cutoffTimestamp) {
                 $old[] = $file;
             }
@@ -108,14 +111,14 @@ class MonitoringPruneService
             return;
         }
 
-        foreach (glob($scansDir . '/*/*', GLOB_ONLYDIR) as $pageDir) {
-            if (count(glob($pageDir . '/*')) === 0) {
+        foreach (glob($scansDir . '/*/*', GLOB_ONLYDIR) ?: [] as $pageDir) {
+            if (count(glob($pageDir . '/*') ?: []) === 0) {
                 @rmdir($pageDir);
             }
         }
 
-        foreach (glob($scansDir . '/*', GLOB_ONLYDIR) as $siteDir) {
-            if (count(glob($siteDir . '/*')) === 0) {
+        foreach (glob($scansDir . '/*', GLOB_ONLYDIR) ?: [] as $siteDir) {
+            if (count(glob($siteDir . '/*') ?: []) === 0) {
                 @rmdir($siteDir);
             }
         }

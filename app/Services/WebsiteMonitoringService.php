@@ -76,7 +76,7 @@ class WebsiteMonitoringService
                 $scanData = $this->performDeepScan($website, $html);
                 $result['content_changed'] = $scanData['any_significant_change'];
                 $result['scan_results'] = $scanData;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::warning("Deep scan failed for {$website->url}: " . $e->getMessage());
                 // Leave scan_results null; do not affect status
             }
@@ -90,7 +90,7 @@ class WebsiteMonitoringService
             $result['status'] = 'error';
             $result['error_message'] = $e->getMessage();
             $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $result['status'] = 'error';
             $result['error_message'] = 'Monitoring failed: ' . $e->getMessage();
             $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
@@ -169,7 +169,9 @@ class WebsiteMonitoringService
 
         if ($previousFile !== null) {
             $previousText = file_get_contents($previousFile);
-            $changePercent = $this->diffPercent($previousText, $text);
+            if (is_string($previousText)) {
+                $changePercent = $this->diffPercent($previousText, $text);
+            }
         }
 
         return [
@@ -187,6 +189,10 @@ class WebsiteMonitoringService
      */
     private function extractNavLinks(string $html, string $baseUrl): array
     {
+        if (trim($html) === '') {
+            return [];
+        }
+
         $links = [];
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
@@ -254,6 +260,10 @@ class WebsiteMonitoringService
      */
     private function checkBrokenAssets(string $html, string $baseUrl): array
     {
+        if (trim($html) === '') {
+            return [];
+        }
+
         $broken = [];
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
@@ -648,7 +658,6 @@ class WebsiteMonitoringService
                 ->save($fullPath);
 
             if (file_exists($fullPath) && filesize($fullPath) > 0) {
-                Log::info("Screenshot saved successfully: {$filename} (" . filesize($fullPath) . " bytes)");
                 return $filename;
             } else {
                 Log::error("Screenshot file was created but is empty: {$filename}");

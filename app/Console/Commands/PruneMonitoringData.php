@@ -11,6 +11,7 @@ class PruneMonitoringData extends Command
     protected $signature = 'monitor:prune
                             {--days=30 : Number of days to retain data (default: 30)}
                             {--dry-run : Show what would be deleted without actually deleting}
+                            {--force : Run without interactive confirmation}
                             {--keep-screenshots : Keep screenshot files even if data is deleted}
                             {--keep-scans : Keep scan snapshot files even if data is deleted}';
 
@@ -25,6 +26,7 @@ class PruneMonitoringData extends Command
     {
         $days = (float) $this->option('days');
         $dryRun = $this->option('dry-run');
+        $force = $this->option('force');
         $keepScreenshots = $this->option('keep-screenshots');
         $keepScans = $this->option('keep-scans');
 
@@ -98,7 +100,7 @@ class PruneMonitoringData extends Command
         if (!empty($scanFilesToDelete))          $extras[] = count($scanFilesToDelete) . " scan snapshot(s)";
         $extraMsg = $extras ? " and " . implode(', ', $extras) : "";
 
-        if (!$this->confirm("Delete {$oldRecords->count()} monitoring records{$extraMsg}?")) {
+        if (!$force && !$this->confirm("Delete {$oldRecords->count()} monitoring records{$extraMsg}?")) {
             $this->info('❌ Operation cancelled.');
             return Command::SUCCESS;
         }
