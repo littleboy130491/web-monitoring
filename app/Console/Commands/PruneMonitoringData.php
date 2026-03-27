@@ -25,10 +25,10 @@ class PruneMonitoringData extends Command
     public function handle(): int
     {
         $days = (float) $this->option('days');
-        $dryRun = $this->option('dry-run');
-        $force = $this->option('force');
-        $keepScreenshots = $this->option('keep-screenshots');
-        $keepScans = $this->option('keep-scans');
+        $dryRun = (bool) $this->option('dry-run');
+        $force = (bool) $this->option('force');
+        $keepScreenshots = (bool) $this->option('keep-screenshots');
+        $keepScans = (bool) $this->option('keep-scans');
 
         if ($days < 0) {
             $this->error('Days must be a non-negative number.');
@@ -48,35 +48,31 @@ class PruneMonitoringData extends Command
             $this->warn('🔍 DRY RUN MODE - No data will actually be deleted');
         }
 
-        $oldRecords = $this->pruneService->getOldRecords($cutoffDate);
+        $oldRecordCount = $this->pruneService->countOldRecords($cutoffDate);
 
-        if ($oldRecords->isEmpty()) {
+        if ($oldRecordCount === 0) {
             $this->info('✅ No old monitoring data found to prune.');
             return Command::SUCCESS;
         }
 
-        $this->info("📊 Found {$oldRecords->count()} monitoring records to prune:");
+        $this->info("📊 Found {$oldRecordCount} monitoring records to prune:");
 
-        $websiteStats = $oldRecords->groupBy('website.name')->map(fn($r) => [
-            'count'  => $r->count(),
-            'oldest' => $r->min('created_at'),
-            'newest' => $r->max('created_at'),
-        ]);
-
-        foreach ($websiteStats as $name => $stats) {
-            $this->line("  📍 {$name}: {$stats['count']} records ({$stats['oldest']} to {$stats['newest']})");
+        foreach ($this->pruneService->getWebsiteStats($cutoffDate) as $stats) {
+            $this->line(
+                "  📍 {$stats->website_name}: {$stats->record_count} records ({$stats->oldest_record} to {$stats->newest_record})"
+            );
         }
 
-        $screenshotsToDelete = !$keepScreenshots
-            ? $oldRecords->whereNotNull('screenshot_path')->pluck('screenshot_path')->unique()->values()
-            : collect();
+        $screenshotCount = !$keepScreenshots
+            ? $this->pruneService->countOldScreenshots($cutoffDate)
+            : 0;
 
         $scanFilesToDelete = !$keepScans
             ? $this->pruneService->collectOldScanFiles($cutoffDate)
             : [];
 
-        if ($screenshotsToDelete->isNotEmpty()) {
-            $this->info("📸 Found {$screenshotsToDelete->count()} screenshot(s) to delete");
+        if ($screenshotCount > 0) {
+            $this->info("📸 Found {$screenshotCount} screenshot(s) to delete");
         }
         if (!empty($scanFilesToDelete)) {
             $this->info("📄 Found " . count($scanFilesToDelete) . " scan snapshot(s) to delete");
@@ -84,9 +80,9 @@ class PruneMonitoringData extends Command
 
         if ($dryRun) {
             $this->info('📋 Dry run summary:');
-            $this->line("  🔍 Would delete: {$oldRecords->count()} monitoring records");
-            if ($screenshotsToDelete->isNotEmpty()) {
-                $this->line("  🔍 Would delete: {$screenshotsToDelete->count()} screenshot(s)");
+            $this->line("  🔍 Would delete: {$oldRecordCount} monitoring records");
+            if ($screenshotCount > 0) {
+                $this->line("  🔍 Would delete: {$screenshotCount} screenshot(s)");
             }
             if (!empty($scanFilesToDelete)) {
                 $this->line("  🔍 Would delete: " . count($scanFilesToDelete) . " scan snapshot(s)");
@@ -96,11 +92,11 @@ class PruneMonitoringData extends Command
 
         // Build confirmation message
         $extras = [];
-        if ($screenshotsToDelete->isNotEmpty()) $extras[] = $screenshotsToDelete->count() . " screenshot(s)";
+        if ($screenshotCount > 0)                  $extras[] = $screenshotCount . " screenshot(s)";
         if (!empty($scanFilesToDelete))          $extras[] = count($scanFilesToDelete) . " scan snapshot(s)";
         $extraMsg = $extras ? " and " . implode(', ', $extras) : "";
 
-        if (!$force && !$this->confirm("Delete {$oldRecords->count()} monitoring records{$extraMsg}?")) {
+        if (!$force && !$this->confirm("Delete {$oldRecordCount} monitoring records{$extraMsg}?")) {
             $this->info('❌ Operation cancelled.');
             return Command::SUCCESS;
         }
@@ -108,11 +104,13 @@ class PruneMonitoringData extends Command
         // --- Screenshots ---
         $deletedScreenshots = 0;
         $screenshotErrors = 0;
-        if ($screenshotsToDelete->isNotEmpty()) {
+        if ($screenshotCount > 0) {
             $this->info('🗑️  Deleting screenshots...');
-            $bar = $this->output->createProgressBar($screenshotsToDelete->count());
+            $bar = $this->output->createProgressBar($screenshotCount);
             $bar->start();
-            $stats = $this->pruneService->deleteScreenshots($oldRecords);
+            $stats = $this->pruneService->deleteOldScreenshots($cutoffDate, function () use ($bar) {
+                $bar->advance();
+            });
             $deletedScreenshots = $stats['deleted'];
             $screenshotErrors = $stats['errors'];
             $bar->finish();
@@ -135,9 +133,11 @@ class PruneMonitoringData extends Command
 
         // --- DB records ---
         $this->info('🗑️  Deleting monitoring records...');
-        $bar = $this->output->createProgressBar($oldRecords->count());
+        $bar = $this->output->createProgressBar($oldRecordCount);
         $bar->start();
-        $deletedRecords = $this->pruneService->deleteRecords($oldRecords);
+        $deletedRecords = $this->pruneService->deleteOldRecords($cutoffDate, function (int $count) use ($bar) {
+            $bar->advance($count);
+        });
         $bar->finish();
         $this->line('');
 

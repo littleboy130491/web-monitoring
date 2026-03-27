@@ -4,19 +4,105 @@ namespace App\Services;
 
 use App\Models\MonitoringResult;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class MonitoringPruneService
 {
     /**
+     * Build the base prune query.
+     */
+    public function oldRecordsQuery(Carbon $cutoffDate): Builder
+    {
+        return MonitoringResult::query()
+            ->where('created_at', '<', $cutoffDate);
+    }
+
+    /**
      * Return all MonitoringResult records created before the cutoff.
      */
     public function getOldRecords(Carbon $cutoffDate): Collection
     {
-        return MonitoringResult::with('website')
-            ->where('created_at', '<', $cutoffDate)
+        return $this->oldRecordsQuery($cutoffDate)
+            ->with('website')
+            ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * Return the number of records eligible for pruning.
+     */
+    public function countOldRecords(Carbon $cutoffDate): int
+    {
+        return (clone $this->oldRecordsQuery($cutoffDate))->count();
+    }
+
+    /**
+     * Return grouped prune stats by website.
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    public function getWebsiteStats(Carbon $cutoffDate)
+    {
+        return DB::table('monitoring_results')
+            ->leftJoin('websites', 'websites.id', '=', 'monitoring_results.website_id')
+            ->where('monitoring_results.created_at', '<', $cutoffDate)
+            ->selectRaw("
+                COALESCE(websites.name, '[Deleted website]') as website_name,
+                COUNT(*) as record_count,
+                MIN(monitoring_results.created_at) as oldest_record,
+                MAX(monitoring_results.created_at) as newest_record
+            ")
+            ->groupBy('website_name')
+            ->orderByDesc('record_count')
+            ->get();
+    }
+
+    /**
+     * Return the number of unique screenshot paths eligible for deletion.
+     */
+    public function countOldScreenshots(Carbon $cutoffDate): int
+    {
+        return (clone $this->oldRecordsQuery($cutoffDate))
+            ->whereNotNull('screenshot_path')
+            ->distinct()
+            ->count('screenshot_path');
+    }
+
+    /**
+     * Delete screenshot files for records older than the cutoff.
+     * Returns ['deleted' => int, 'errors' => int].
+     */
+    public function deleteOldScreenshots(Carbon $cutoffDate, ?callable $progress = null): array
+    {
+        $deleted = 0;
+        $errors = 0;
+
+        DB::table('monitoring_results')
+            ->where('created_at', '<', $cutoffDate)
+            ->whereNotNull('screenshot_path')
+            ->select('screenshot_path')
+            ->distinct()
+            ->orderBy('screenshot_path')
+            ->cursor()
+            ->each(function ($record) use (&$deleted, &$errors, $progress) {
+                try {
+                    if (Storage::disk('public')->exists($record->screenshot_path)) {
+                        Storage::disk('public')->delete($record->screenshot_path);
+                        $deleted++;
+                    }
+                } catch (\Throwable $e) {
+                    $errors++;
+                }
+
+                if ($progress) {
+                    $progress();
+                }
+            });
+
+        return ['deleted' => $deleted, 'errors' => $errors];
     }
 
     /**
@@ -27,14 +113,21 @@ class MonitoringPruneService
     {
         $deleted = 0;
         $errors = 0;
+        $processedPaths = [];
 
-        foreach ($records->whereNotNull('screenshot_path') as $record) {
+        foreach ($records->whereNotNull('screenshot_path')->sortBy('screenshot_path') as $record) {
             try {
+                if (isset($processedPaths[$record->screenshot_path])) {
+                    continue;
+                }
+
+                $processedPaths[$record->screenshot_path] = true;
+
                 if (Storage::disk('public')->exists($record->screenshot_path)) {
                     Storage::disk('public')->delete($record->screenshot_path);
                     $deleted++;
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 $errors++;
             }
         }
@@ -80,7 +173,7 @@ class MonitoringPruneService
                     unlink($file);
                     $deleted++;
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 $errors++;
             }
         }
@@ -98,7 +191,34 @@ class MonitoringPruneService
     {
         $count = $records->count();
         MonitoringResult::whereIn('id', $records->pluck('id'))->delete();
+
         return $count;
+    }
+
+    /**
+     * Delete old MonitoringResult records in chunks.
+     */
+    public function deleteOldRecords(Carbon $cutoffDate, ?callable $progress = null): int
+    {
+        $deleted = 0;
+
+        (clone $this->oldRecordsQuery($cutoffDate))
+            ->select('id')
+            ->orderBy('id')
+            ->chunkById(1000, function ($records) use (&$deleted, $progress) {
+                $ids = $records->pluck('id');
+
+                MonitoringResult::whereIn('id', $ids)->delete();
+
+                $count = $ids->count();
+                $deleted += $count;
+
+                if ($progress) {
+                    $progress($count);
+                }
+            });
+
+        return $deleted;
     }
 
     /**
@@ -134,11 +254,9 @@ class MonitoringPruneService
         bool $keepScreenshots = false,
         bool $keepScans = false
     ): array {
-        $records = $this->getOldRecords($cutoffDate);
-
         $screenshotStats = ['deleted' => 0, 'errors' => 0];
         if (!$keepScreenshots) {
-            $screenshotStats = $this->deleteScreenshots($records);
+            $screenshotStats = $this->deleteOldScreenshots($cutoffDate);
         }
 
         $scanStats = ['deleted' => 0, 'errors' => 0];
@@ -147,7 +265,7 @@ class MonitoringPruneService
             $scanStats = $this->deleteScanFiles($scanFiles);
         }
 
-        $deletedRecords = $this->deleteRecords($records);
+        $deletedRecords = $this->deleteOldRecords($cutoffDate);
 
         return [
             'records'           => $deletedRecords,
