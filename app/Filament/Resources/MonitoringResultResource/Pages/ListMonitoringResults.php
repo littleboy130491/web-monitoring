@@ -23,7 +23,7 @@ class ListMonitoringResults extends ListRecords
                     Forms\Components\TextInput::make('days')
                         ->label('Days to keep')
                         ->numeric()
-                        ->default(30)
+                        ->default((int) config('monitoring.prune_days', 30))
                         ->required()
                         ->minValue(0)
                         ->maxValue(365)

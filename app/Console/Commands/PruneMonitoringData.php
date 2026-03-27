@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class PruneMonitoringData extends Command
 {
     protected $signature = 'monitor:prune
-                            {--days=30 : Number of days to retain data (default: 30)}
+                            {--days= : Number of days to retain data (defaults to MONITORING_PRUNE_DAYS or 30)}
                             {--dry-run : Show what would be deleted without actually deleting}
                             {--force : Run without interactive confirmation}
                             {--keep-screenshots : Keep screenshot files even if data is deleted}
@@ -24,7 +24,8 @@ class PruneMonitoringData extends Command
 
     public function handle(): int
     {
-        $days = (float) $this->option('days');
+        $daysOption = $this->option('days');
+        $days = is_numeric($daysOption) ? (float) $daysOption : (float) config('monitoring.prune_days', 30);
         $dryRun = (bool) $this->option('dry-run');
         $force = (bool) $this->option('force');
         $keepScreenshots = (bool) $this->option('keep-screenshots');
