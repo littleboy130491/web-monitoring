@@ -50,12 +50,12 @@ class MonitoringPruneService
             ->leftJoin('websites', 'websites.id', '=', 'monitoring_results.website_id')
             ->where('monitoring_results.created_at', '<', $cutoffDate)
             ->selectRaw("
-                COALESCE(websites.name, '[Deleted website]') as website_name,
+                COALESCE(websites.url, '[Deleted website]') as website_name,
                 COUNT(*) as record_count,
                 MIN(monitoring_results.created_at) as oldest_record,
                 MAX(monitoring_results.created_at) as newest_record
             ")
-            ->groupBy('website_name')
+            ->groupBy('monitoring_results.website_id', 'websites.url')
             ->orderByDesc('record_count')
             ->get();
     }
@@ -141,13 +141,13 @@ class MonitoringPruneService
     public function collectOldScanFiles(Carbon $cutoffDate): array
     {
         $scansDir = storage_path('app/scans');
-        if (!is_dir($scansDir)) {
+        if (! is_dir($scansDir)) {
             return [];
         }
 
         $cutoffTimestamp = $cutoffDate->timestamp;
         $old = [];
-        $files = glob($scansDir . '/*/*/*.txt') ?: [];
+        $files = glob($scansDir.'/*/*/*.txt') ?: [];
 
         foreach ($files as $file) {
             if (filemtime($file) < $cutoffTimestamp) {
@@ -227,18 +227,18 @@ class MonitoringPruneService
     public function removeEmptyScanDirs(): void
     {
         $scansDir = storage_path('app/scans');
-        if (!is_dir($scansDir)) {
+        if (! is_dir($scansDir)) {
             return;
         }
 
-        foreach (glob($scansDir . '/*/*', GLOB_ONLYDIR) ?: [] as $pageDir) {
-            if (count(glob($pageDir . '/*') ?: []) === 0) {
+        foreach (glob($scansDir.'/*/*', GLOB_ONLYDIR) ?: [] as $pageDir) {
+            if (count(glob($pageDir.'/*') ?: []) === 0) {
                 @rmdir($pageDir);
             }
         }
 
-        foreach (glob($scansDir . '/*', GLOB_ONLYDIR) ?: [] as $siteDir) {
-            if (count(glob($siteDir . '/*') ?: []) === 0) {
+        foreach (glob($scansDir.'/*', GLOB_ONLYDIR) ?: [] as $siteDir) {
+            if (count(glob($siteDir.'/*') ?: []) === 0) {
                 @rmdir($siteDir);
             }
         }
@@ -255,12 +255,12 @@ class MonitoringPruneService
         bool $keepScans = false
     ): array {
         $screenshotStats = ['deleted' => 0, 'errors' => 0];
-        if (!$keepScreenshots) {
+        if (! $keepScreenshots) {
             $screenshotStats = $this->deleteOldScreenshots($cutoffDate);
         }
 
         $scanStats = ['deleted' => 0, 'errors' => 0];
-        if (!$keepScans) {
+        if (! $keepScans) {
             $scanFiles = $this->collectOldScanFiles($cutoffDate);
             $scanStats = $this->deleteScanFiles($scanFiles);
         }
@@ -268,11 +268,11 @@ class MonitoringPruneService
         $deletedRecords = $this->deleteOldRecords($cutoffDate);
 
         return [
-            'records'           => $deletedRecords,
-            'screenshots'       => $screenshotStats['deleted'],
+            'records' => $deletedRecords,
+            'screenshots' => $screenshotStats['deleted'],
             'screenshot_errors' => $screenshotStats['errors'],
-            'scans'             => $scanStats['deleted'],
-            'scan_errors'       => $scanStats['errors'],
+            'scans' => $scanStats['deleted'],
+            'scan_errors' => $scanStats['errors'],
         ];
     }
 }

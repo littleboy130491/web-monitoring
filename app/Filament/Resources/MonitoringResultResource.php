@@ -29,7 +29,7 @@ class MonitoringResultResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Select::make('website_id')
-                    ->relationship('website', 'name')
+                    ->relationship('website', 'url')
                     ->required()
                     ->disabled(),
                 Forms\Components\TextInput::make('status')
@@ -59,11 +59,11 @@ class MonitoringResultResource extends Resource
                     ->sortable()
                     ->searchable()
                     ->label('Website')
-                    ->url(fn($record): string => $record->website->url)
+                    ->url(fn ($record): string => $record->website->url)
                     ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'up' => 'success',
                         'down' => 'danger',
                         'error' => 'danger',
@@ -73,7 +73,7 @@ class MonitoringResultResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('status_code')
                     ->badge()
-                    ->color(fn(?int $state): string => match (true) {
+                    ->color(fn (?int $state): string => match (true) {
                         $state >= 200 && $state < 300 => 'success',
                         $state >= 300 && $state < 400 => 'warning',
                         $state >= 400 => 'danger',
@@ -85,7 +85,7 @@ class MonitoringResultResource extends Resource
                     ->numeric()
                     ->sortable()
                     ->suffix(' ms')
-                    ->color(fn(?int $state): string => match (true) {
+                    ->color(fn (?int $state): string => match (true) {
                         $state < 1000 => 'success',
                         $state < 3000 => 'warning',
                         $state >= 3000 => 'danger',
@@ -94,13 +94,13 @@ class MonitoringResultResource extends Resource
                 Tables\Columns\IconColumn::make('scan_results.any_significant_change')
                     ->boolean()
                     ->label('Significant Content Changed')
-                    ->getStateUsing(fn($record) => (bool) ($record->scan_results['any_significant_change'] ?? false))
+                    ->getStateUsing(fn ($record) => (bool) ($record->scan_results['any_significant_change'] ?? false))
                     ->trueColor('danger')
                     ->falseColor('success'),
                 Tables\Columns\IconColumn::make('scan_results.broken_assets')
                     ->boolean()
                     ->label('Has Broken Assets')
-                    ->getStateUsing(fn($record) => (bool) ($record->scan_results['broken_assets'] ?? false))
+                    ->getStateUsing(fn ($record) => (bool) ($record->scan_results['broken_assets'] ?? false))
                     ->trueColor('danger')
                     ->falseColor('success'),
                 Tables\Columns\ImageColumn::make('screenshot_path')
@@ -109,28 +109,42 @@ class MonitoringResultResource extends Resource
                     ->width(70)
                     ->label('Screenshot')
                     ->visibility('public')
-                    ->url(fn($record): string => ($record->screenshot_path ? Storage::url($record->screenshot_path) : ''))
+                    ->url(fn ($record): string => ($record->screenshot_path ? Storage::url($record->screenshot_path) : ''))
                     ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('scan_badge')
                     ->label('Scan')
                     ->getStateUsing(function ($record): string {
                         $data = $record->scan_results;
-                        if (empty($data)) return '—';
+                        if (empty($data)) {
+                            return '—';
+                        }
                         $broken = count($data['broken_assets'] ?? []);
-                        if ($broken > 0) return "{$broken} broken asset(s)";
+                        if ($broken > 0) {
+                            return "{$broken} broken asset(s)";
+                        }
+
                         return 'OK';
                     })
                     ->color(function ($record): string {
                         $data = $record->scan_results;
-                        if (empty($data)) return 'gray';
-                        if ($data['any_significant_change'] ?? false) return 'warning';
-                        if (!empty($data['broken_assets'])) return 'warning';
+                        if (empty($data)) {
+                            return 'gray';
+                        }
+                        if ($data['any_significant_change'] ?? false) {
+                            return 'warning';
+                        }
+                        if (! empty($data['broken_assets'])) {
+                            return 'warning';
+                        }
+
                         return 'success';
                     })
                     ->badge()
                     ->tooltip(function ($record): ?string {
                         $data = $record->scan_results;
-                        if (empty($data)) return null;
+                        if (empty($data)) {
+                            return null;
+                        }
                         $lines = [];
                         foreach ($data['pages'] ?? [] as $page) {
                             $flag = $page['significant'] ? ' ⚠' : '';
@@ -139,6 +153,7 @@ class MonitoringResultResource extends Resource
                         foreach ($data['broken_assets'] ?? [] as $asset) {
                             $lines[] = "404: {$asset['url']}";
                         }
+
                         return implode("\n", $lines);
                     }),
                 Tables\Columns\TextColumn::make('domain_days_until_expiry')
@@ -146,15 +161,15 @@ class MonitoringResultResource extends Resource
                     ->sortable()
                     ->formatStateUsing(fn (?int $state): string => match (true) {
                         $state === null => '—',
-                        $state <= 0    => 'Expired',
-                        default        => "{$state}d left",
+                        $state <= 0 => 'Expired',
+                        default => "{$state}d left",
                     })
                     ->color(fn (?int $state): string => match (true) {
-                        $state === null  => 'gray',
-                        $state <= 0      => 'danger',
-                        $state <= 7      => 'danger',
-                        $state <= 30     => 'warning',
-                        default          => 'success',
+                        $state === null => 'gray',
+                        $state <= 0 => 'danger',
+                        $state <= 7 => 'danger',
+                        $state <= 30 => 'warning',
+                        default => 'success',
                     })
                     ->badge()
                     ->tooltip(fn ($record): ?string => $record->domain_expires_at?->format('Y-m-d')),
@@ -184,27 +199,27 @@ class MonitoringResultResource extends Resource
                         'warning' => 'Warning',
                     ]),
                 Tables\Filters\Filter::make('has_screenshot')
-                    ->query(fn(Builder $query): Builder => $query->whereNotNull('screenshot_path'))
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('screenshot_path'))
                     ->label('Has Screenshot'),
                 Tables\Filters\Filter::make('no_screenshot')
-                    ->query(fn(Builder $query): Builder => $query->whereNull('screenshot_path'))
+                    ->query(fn (Builder $query): Builder => $query->whereNull('screenshot_path'))
                     ->label('No Screenshot'),
                 Tables\Filters\Filter::make('last_24_hours')
-                    ->query(fn(Builder $query): Builder => $query->where('checked_at', '>=', now()->subDay()))
+                    ->query(fn (Builder $query): Builder => $query->where('checked_at', '>=', now()->subDay()))
                     ->label('Last 24 Hours'),
                 Tables\Filters\Filter::make('has_broken_assets')
-                    ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('scan_results')
                         ->whereRaw("JSON_LENGTH(scan_results, '$.broken_assets') > 0"))
                     ->label('Has Broken Assets'),
                 Tables\Filters\Filter::make('content_scan_changed')
-                    ->query(fn(Builder $query): Builder => $query->whereNotNull('scan_results')
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('scan_results')
                         ->whereRaw("json_extract(scan_results, '$.any_significant_change') = 1"))
                     ->label('Significant Content Change'),
                 Tables\Filters\Filter::make('domain_expiring_soon')
-                    ->query(fn(Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 7))
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 7))
                     ->label('Domain Expiring ≤7 Days'),
                 Tables\Filters\Filter::make('domain_expired')
-                    ->query(fn(Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 0))
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('domain_days_until_expiry')->where('domain_days_until_expiry', '<=', 0))
                     ->label('Domain Expired'),
             ])
             ->actions([

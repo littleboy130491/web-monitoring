@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\Website;
 use App\Models\MonitoringResult;
+use App\Models\Website;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use Spatie\Browsershot\Browsershot;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Spatie\Browsershot\Browsershot;
 
 class WebsiteMonitoringService
 {
@@ -25,7 +25,7 @@ class WebsiteMonitoringService
 
     public function __construct()
     {
-        $this->client = new Client();
+        $this->client = new Client;
     }
 
     /**
@@ -77,7 +77,7 @@ class WebsiteMonitoringService
                 $result['content_changed'] = $scanData['any_significant_change'];
                 $result['scan_results'] = $scanData;
             } catch (\Throwable $e) {
-                Log::warning("Deep scan failed for {$website->url}: " . $e->getMessage());
+                Log::warning("Deep scan failed for {$website->url}: ".$e->getMessage());
                 // Leave scan_results null; do not affect status
             }
 
@@ -92,7 +92,7 @@ class WebsiteMonitoringService
             $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
         } catch (\Throwable $e) {
             $result['status'] = 'error';
-            $result['error_message'] = 'Monitoring failed: ' . $e->getMessage();
+            $result['error_message'] = 'Monitoring failed: '.$e->getMessage();
             $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
         }
 
@@ -128,7 +128,7 @@ class WebsiteMonitoringService
                 $pageSlug = $this->pageSlug($navUrl);
                 $pages[] = $this->scanPage($pageSlug, $websiteSlug, $navHtml, $navUrl);
             } catch (\Exception $e) {
-                Log::warning("Deep scan: failed to fetch nav link {$navUrl}: " . $e->getMessage());
+                Log::warning("Deep scan: failed to fetch nav link {$navUrl}: ".$e->getMessage());
             }
         }
 
@@ -157,10 +157,10 @@ class WebsiteMonitoringService
         $previousFile = $this->findLatestFile($dir);
 
         // Save current snapshot
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
-        $filename = now()->format('Y-m-d_H-i-s') . '.txt';
+        $filename = now()->format('Y-m-d_H-i-s').'.txt';
         file_put_contents("{$dir}/{$filename}", $text);
 
         // Compare with previous
@@ -194,7 +194,7 @@ class WebsiteMonitoringService
         }
 
         $links = [];
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
         libxml_use_internal_errors(true);
         $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
@@ -228,10 +228,10 @@ class WebsiteMonitoringService
 
             // Resolve to absolute URL
             if (str_starts_with($href, '//')) {
-                $href = $baseScheme . ':' . $href;
+                $href = $baseScheme.':'.$href;
             } elseif (str_starts_with($href, '/')) {
-                $href = $baseScheme . '://' . $baseHost . $href;
-            } elseif (!str_starts_with($href, 'http')) {
+                $href = $baseScheme.'://'.$baseHost.$href;
+            } elseif (! str_starts_with($href, 'http')) {
                 continue;
             }
 
@@ -265,7 +265,7 @@ class WebsiteMonitoringService
         }
 
         $broken = [];
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
         libxml_use_internal_errors(true);
         $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
@@ -329,6 +329,7 @@ class WebsiteMonitoringService
         $text = strip_tags($html);
         // Collapse whitespace
         $text = preg_replace('/\s+/', ' ', $text);
+
         return trim($text);
     }
 
@@ -347,20 +348,22 @@ class WebsiteMonitoringService
         $new = substr($new, 0, self::MAX_DIFF_BYTES);
 
         similar_text($old, $new, $similarity);
+
         return round(100.0 - $similarity, 2);
     }
 
     /** Find the most recently created .txt file in a directory, or null. */
     private function findLatestFile(string $directory): ?string
     {
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             return null;
         }
-        $files = glob($directory . '/*.txt');
+        $files = glob($directory.'/*.txt');
         if (empty($files)) {
             return null;
         }
         sort($files); // datetime-prefixed filenames sort chronologically
+
         return end($files) ?: null;
     }
 
@@ -369,6 +372,7 @@ class WebsiteMonitoringService
     {
         $host = parse_url($url, PHP_URL_HOST) ?? $url;
         $host = preg_replace('/^www\./', '', $host);
+
         return Str::slug($host);
     }
 
@@ -379,6 +383,7 @@ class WebsiteMonitoringService
         if ($path === '' || $path === '/') {
             return 'home';
         }
+
         return Str::slug(str_replace('/', '-', $path)) ?: 'home';
     }
 
@@ -390,14 +395,15 @@ class WebsiteMonitoringService
             return null;
         }
         if (str_starts_with($href, '//')) {
-            return $scheme . ':' . $href;
+            return $scheme.':'.$href;
         }
         if (str_starts_with($href, '/')) {
-            return $scheme . '://' . $host . $href;
+            return $scheme.'://'.$host.$href;
         }
         if (str_starts_with($href, 'http')) {
             return $href;
         }
+
         return null;
     }
 
@@ -487,7 +493,7 @@ class WebsiteMonitoringService
 
         try {
             $host = parse_url($url, PHP_URL_HOST);
-            if (!$host) {
+            if (! $host) {
                 return $result;
             }
 
@@ -498,50 +504,50 @@ class WebsiteMonitoringService
             }
 
             $tld = strtolower(end($parts));
-            $sld = count($parts) >= 3 ? strtolower($parts[count($parts) - 2] . '.' . $tld) : null;
+            $sld = count($parts) >= 3 ? strtolower($parts[count($parts) - 2].'.'.$tld) : null;
 
             // Second-level domain WHOIS servers — must be checked before TLD map
             // because domain extraction also differs (3 parts instead of 2)
             $whoisServersBySld = [
-                'co.id'  => 'whois.id',
-                'or.id'  => 'whois.id',
+                'co.id' => 'whois.id',
+                'or.id' => 'whois.id',
                 'net.id' => 'whois.id',
-                'go.id'  => 'whois.id',
-                'ac.id'  => 'whois.id',
-                'co.uk'  => 'whois.nic.uk',
+                'go.id' => 'whois.id',
+                'ac.id' => 'whois.id',
+                'co.uk' => 'whois.nic.uk',
                 'org.uk' => 'whois.nic.uk',
-                'me.uk'  => 'whois.nic.uk',
+                'me.uk' => 'whois.nic.uk',
                 'com.au' => 'whois.auda.org.au',
                 'net.au' => 'whois.auda.org.au',
                 'org.au' => 'whois.auda.org.au',
             ];
 
             $whoisServers = [
-                'com'  => 'whois.verisign-grs.com',
-                'net'  => 'whois.verisign-grs.com',
-                'org'  => 'whois.pir.org',
+                'com' => 'whois.verisign-grs.com',
+                'net' => 'whois.verisign-grs.com',
+                'org' => 'whois.pir.org',
                 'info' => 'whois.afilias.net',
-                'biz'  => 'whois.biz',
-                'io'   => 'whois.nic.io',
-                'co'   => 'whois.registry.co',
-                'us'   => 'whois.nic.us',
-                'uk'   => 'whois.nic.uk',
-                'au'   => 'whois.auda.org.au',
-                'de'   => 'whois.denic.de',
-                'fr'   => 'whois.nic.fr',
-                'nl'   => 'whois.domain-registry.nl',
-                'ca'   => 'whois.cira.ca',
-                'app'  => 'whois.nic.google',
-                'dev'  => 'whois.nic.google',
-                'id'   => 'whois.id',
-                'me'   => 'whois.nic.me',
-                'tv'   => 'whois.nic.tv',
-                'cc'   => 'whois.nic.cc',
+                'biz' => 'whois.biz',
+                'io' => 'whois.nic.io',
+                'co' => 'whois.registry.co',
+                'us' => 'whois.nic.us',
+                'uk' => 'whois.nic.uk',
+                'au' => 'whois.auda.org.au',
+                'de' => 'whois.denic.de',
+                'fr' => 'whois.nic.fr',
+                'nl' => 'whois.domain-registry.nl',
+                'ca' => 'whois.cira.ca',
+                'app' => 'whois.nic.google',
+                'dev' => 'whois.nic.google',
+                'id' => 'whois.id',
+                'me' => 'whois.nic.me',
+                'tv' => 'whois.nic.tv',
+                'cc' => 'whois.nic.cc',
                 'mobi' => 'whois.dotmobiregistry.net',
                 'name' => 'whois.nic.name',
-                'pro'  => 'whois.registry.pro',
-                'law'  => 'whois.nic.law',
-                'tax'  => 'whois.nic.tax',
+                'pro' => 'whois.registry.pro',
+                'law' => 'whois.nic.law',
+                'tax' => 'whois.nic.tax',
             ];
 
             // SLD match: use 3-part registrable domain (e.g. example.co.id)
@@ -553,7 +559,7 @@ class WebsiteMonitoringService
                 $whoisServer = $whoisServers[$tld] ?? null;
 
                 // Fallback: ask IANA for the authoritative WHOIS server
-                if (!$whoisServer) {
+                if (! $whoisServer) {
                     $ianaResponse = $this->queryWhois('whois.iana.org', $tld, 5);
                     if ($ianaResponse && preg_match('/whois:\s+(\S+)/i', $ianaResponse, $m)) {
                         $whoisServer = trim($m[1]);
@@ -561,12 +567,12 @@ class WebsiteMonitoringService
                 }
             }
 
-            if (!$whoisServer) {
+            if (! $whoisServer) {
                 return $result;
             }
 
             $response = $this->queryWhois($whoisServer, $domain, 10);
-            if (!$response) {
+            if (! $response) {
                 return $result;
             }
 
@@ -596,7 +602,7 @@ class WebsiteMonitoringService
                 }
             }
         } catch (\Exception $e) {
-            Log::warning("Domain WHOIS check failed for {$url}: " . $e->getMessage());
+            Log::warning("Domain WHOIS check failed for {$url}: ".$e->getMessage());
         }
 
         return $result;
@@ -605,15 +611,15 @@ class WebsiteMonitoringService
     private function queryWhois(string $server, string $query, int $timeout = 10): ?string
     {
         $socket = @fsockopen($server, 43, $errno, $errstr, $timeout);
-        if (!$socket) {
+        if (! $socket) {
             return null;
         }
 
         stream_set_timeout($socket, $timeout);
-        fwrite($socket, $query . "\r\n");
+        fwrite($socket, $query."\r\n");
 
         $response = '';
-        while (!feof($socket)) {
+        while (! feof($socket)) {
             $chunk = fgets($socket, 4096);
             if ($chunk === false) {
                 break;
@@ -628,19 +634,22 @@ class WebsiteMonitoringService
     private function takeScreenshot(Website $website): ?string
     {
         try {
-            $filename = 'screenshots/' . $website->id . '_' . now()->format('Y-m-d_H-i-s') . '.jpg';
-            $fullPath = storage_path('app/public/' . $filename);
+            $filename = 'screenshots/'.$website->id.'_'.now()->format('Y-m-d_H-i-s').'.jpg';
+            $fullPath = storage_path('app/public/'.$filename);
 
             $dir = dirname($fullPath);
-            if (!is_dir($dir)) {
+            if (! is_dir($dir)) {
                 mkdir($dir, 0755, true);
             }
 
             $chromePath = $this->findChromePath();
-            if (!$chromePath) {
+            if (! $chromePath) {
                 Log::error('No Chrome or Chromium installation found on system.');
+
                 return null;
             }
+
+            $timeout = (int) config('monitoring.screenshot_timeout', 45);
 
             Browsershot::url($website->url)
                 ->setChromePath($chromePath)
@@ -648,7 +657,7 @@ class WebsiteMonitoringService
                 ->dismissDialogs()
                 ->windowSize(1280, 720)
                 ->waitUntilNetworkIdle(false)
-                ->timeout(20)
+                ->timeout($timeout)
                 ->setOption('no-first-run', true)
                 ->setOption('disable-gpu', true)
                 ->setOption('disable-dev-shm-usage', true)
@@ -661,11 +670,13 @@ class WebsiteMonitoringService
                 return $filename;
             } else {
                 Log::error("Screenshot file was created but is empty: {$filename}");
+
                 return null;
             }
 
         } catch (\Exception $e) {
-            Log::error("Screenshot failed for {$website->url}: " . $e->getMessage());
+            Log::error("Screenshot failed for {$website->url}: ".$e->getMessage());
+
             return null;
         }
     }

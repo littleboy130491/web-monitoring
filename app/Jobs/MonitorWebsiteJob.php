@@ -2,20 +2,21 @@
 
 namespace App\Jobs;
 
-use App\Models\Website;
 use App\Models\MonitoringResult;
 use App\Models\User;
+use App\Models\Website;
 use App\Services\WebsiteMonitoringService;
+use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Filament\Notifications\Notification;
 
 class MonitorWebsiteJob implements ShouldQueue
 {
     use Batchable, Queueable;
 
-    public $timeout = 120; // 2 minutes timeout
+    public $timeout = 180; // 3 minutes timeout
+
     public $tries = 3;
 
     /**
@@ -26,7 +27,7 @@ class MonitorWebsiteJob implements ShouldQueue
         public bool $takeScreenshot = false,
         public int $requestTimeout = 30
     ) {
-        //
+        $this->timeout = (int) config('monitoring.job_timeout', 180);
     }
 
     /**
@@ -43,7 +44,6 @@ class MonitorWebsiteJob implements ShouldQueue
         // Send notifications for status changes and important events
         $this->sendNotifications($monitoringResult);
     }
-
 
     private function sendNotifications(MonitoringResult $result): void
     {
@@ -83,7 +83,7 @@ class MonitorWebsiteJob implements ShouldQueue
 
             // Notification for broken assets (e.g. stale Elementor CSS)
             $scanResults = $result->scan_results;
-            if (!empty($scanResults['broken_assets'])) {
+            if (! empty($scanResults['broken_assets'])) {
                 $this->sendBrokenAssetsNotification($user, $result, $scanResults['broken_assets']);
             }
         }

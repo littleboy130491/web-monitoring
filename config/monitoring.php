@@ -12,4 +12,16 @@ return [
      | Can be overridden with MONITORING_PRUNE_DAYS in your .env file.
      */
     'prune_days' => (int) env('MONITORING_PRUNE_DAYS', 30),
+
+    /*
+     | Screenshot capture timeout in seconds.
+     | Some monitored sites take longer to settle in headless Chrome.
+     */
+    'screenshot_timeout' => (int) env('MONITORING_SCREENSHOT_TIMEOUT', 45),
+
+    /*
+     | Queue job timeout for each monitor job in seconds.
+     | Keep this above request + deep scan + screenshot timeouts.
+     */
+    'job_timeout' => (int) env('MONITORING_JOB_TIMEOUT', 180),
 ];

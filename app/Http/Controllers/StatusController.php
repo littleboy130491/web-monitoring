@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
-use App\Models\MonitoringResult;
-use Illuminate\Http\Request;
 
 class StatusController extends Controller
 {
@@ -12,7 +10,7 @@ class StatusController extends Controller
     {
         $websites = Website::where('is_active', true)
             ->with(['latestResult'])
-            ->orderBy('name')
+            ->orderBy('url')
             ->get();
 
         $totalWebsites = $websites->count();
