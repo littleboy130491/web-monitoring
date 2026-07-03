@@ -12,6 +12,15 @@ class GenerateMonitoringReportJob implements ShouldQueue
 {
     use Queueable;
 
+    public $tries = 3;
+
+    public $timeout = 120;
+
+    public function backoff(): array
+    {
+        return [30, 120];
+    }
+
     public function __construct(
         public Carbon $startedAt,
         public string $triggeredBy = 'manual'

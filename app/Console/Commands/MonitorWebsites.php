@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\GenerateMonitoringReportJob;
 use App\Models\Website;
 use App\Services\MonitoringReportService;
 use App\Services\WebsiteMonitoringService;
@@ -13,7 +14,8 @@ class MonitorWebsites extends Command
     protected $signature = 'monitor:websites 
                             {--id= : Monitor specific website ID}
                             {--screenshot : Take screenshots of websites}
-                            {--timeout=30 : Request timeout in seconds}';
+                            {--timeout=30 : Request timeout in seconds}
+                            {--queue-report : Queue the email report after monitoring completes}';
 
     protected $description = 'Monitor websites for status, health, content changes, and take screenshots';
 
@@ -26,12 +28,15 @@ class MonitorWebsites extends Command
 
     public function handle(): int
     {
+        $startedAt = now();
+
         $this->info('Starting website monitoring...');
 
         $websites = $this->getWebsitesToMonitor();
 
         if ($websites->isEmpty()) {
             $this->warn('No active websites found to monitor.');
+
             return Command::SUCCESS;
         }
 
@@ -40,7 +45,7 @@ class MonitorWebsites extends Command
         $bar = $this->output->createProgressBar($websites->count());
         $bar->start();
 
-        $results = new Collection();
+        $results = new Collection;
 
         foreach ($websites as $website) {
             $result = $this->monitoringService->monitor(
@@ -56,6 +61,13 @@ class MonitorWebsites extends Command
         $bar->finish();
         $this->newLine();
         $this->info('Website monitoring completed!');
+
+        if ($this->option('queue-report')) {
+            GenerateMonitoringReportJob::dispatch($startedAt, 'command');
+            $this->info('Monitoring report queued.');
+
+            return Command::SUCCESS;
+        }
 
         // Generate and send email report
         $this->info('Sending monitoring report...');
@@ -80,7 +92,6 @@ class MonitorWebsites extends Command
 
         return Website::where('is_active', true)->get();
     }
-
 
     private function displayResult(Website $website, array $result): void
     {
@@ -115,7 +126,7 @@ class MonitorWebsites extends Command
             $this->line("   SSL: Expires in {$ssl['expires_in_days']} days");
         }
 
-        if (!empty($result['domain_days_until_expiry'])) {
+        if (! empty($result['domain_days_until_expiry'])) {
             $days = $result['domain_days_until_expiry'];
             $date = $result['domain_expires_at'] ?? '?';
             if ($days <= 0) {
@@ -133,11 +144,11 @@ class MonitorWebsites extends Command
             $scan = is_array($scan) ? $scan : json_decode($scan, true);
         }
 
-        if (!empty($scan['pages'])) {
+        if (! empty($scan['pages'])) {
             foreach ($scan['pages'] as $page) {
                 $pct = $page['change_percent'];
                 $slug = $page['slug'];
-                $first = !$page['previous_file_found'];
+                $first = ! $page['previous_file_found'];
 
                 if ($first) {
                     $this->line("   Scan [{$slug}]: first snapshot saved");
@@ -149,7 +160,7 @@ class MonitorWebsites extends Command
             }
         }
 
-        if (!empty($scan['broken_assets'])) {
+        if (! empty($scan['broken_assets'])) {
             $count = count($scan['broken_assets']);
             $this->line("   <fg=red>Broken assets: {$count} file(s) returning 404</fg=red>");
             foreach ($scan['broken_assets'] as $asset) {

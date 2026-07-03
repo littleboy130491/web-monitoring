@@ -9,7 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule monitoring tasks
-Schedule::command('monitor:websites --screenshot')->twiceDaily(12, 0)->withoutOverlapping();
+Schedule::command('monitor:websites --screenshot --queue-report')->twiceDaily(12, 0)->withoutOverlapping();
 Schedule::command('monitor:prune --force')->daily();
 
 // Auto-prune monitoring reports older than 30 days
