@@ -41,6 +41,8 @@ The server also offers a read-only resource, `monitoring://status/overview`, wit
 
 ## Transports
 
+For installing and updating the app itself, see [deployment.md](deployment.md).
+
 | Transport | How it starts | Auth |
 |---|---|---|
 | Local (stdio) | `php artisan mcp:start web-monitoring` | None; runs as the local user |
