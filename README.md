@@ -96,6 +96,8 @@ A comprehensive Laravel 12.x web monitoring application that tracks website stat
 
 ### Production Setup
 
+For a full production guide (`.env` settings, Supervisor, updating, upgrading to the MCP/AI release, verification, rollback and troubleshooting), see **[docs/deployment.md](docs/deployment.md)**. In short:
+
 9. **Create Admin User**
    ```bash
    php artisan make:filament-user
@@ -112,7 +114,7 @@ A comprehensive Laravel 12.x web monitoring application that tracks website stat
     # Create supervisor config: /etc/supervisor/conf.d/web-monitor-worker.conf
     [program:web-monitor-worker]
     process_name=%(program_name)s_%(process_num)02d
-    command=php /path/to/web-monitoring/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    command=php /path/to/web-monitoring/artisan queue:work --sleep=3 --tries=3 --timeout=240 --max-time=3600
     autostart=true
     autorestart=true
     stopasgroup=true
@@ -128,6 +130,25 @@ A comprehensive Laravel 12.x web monitoring application that tracks website stat
     sudo supervisorctl update
     sudo supervisorctl start web-monitor-worker:*
     ```
+
+12. **Cache Configuration** (rerun after every `.env` change)
+    ```bash
+    php artisan optimize
+    php artisan filament:optimize
+    ```
+
+### Updating
+
+```bash
+php artisan down
+git pull origin main
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+php artisan migrate --force
+php artisan optimize && php artisan filament:optimize
+php artisan queue:restart
+php artisan up
+```
 
 ## Usage
 

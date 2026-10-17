@@ -104,6 +104,8 @@ Note: The `composer dev-simple` command is recommended for stable operation, as 
 
 ## Environment Setup
 
+Production deployment, updating and rollback: `docs/deployment.md`.
+
 1. Copy `.env.example` to `.env`
 2. Generate application key: `php artisan key:generate`
 3. SQLite database file is auto-created at `database/database.sqlite`

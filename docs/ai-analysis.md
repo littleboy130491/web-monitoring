@@ -37,6 +37,8 @@ The admin panel has an "AI: Broken Layout" filter; MCP's `list-ai-findings` with
 
 ## Setup
 
+For installing and updating the app itself, see [deployment.md](deployment.md).
+
 Set at least one key in `.env`, then run `php artisan migrate`.
 
 ```env
