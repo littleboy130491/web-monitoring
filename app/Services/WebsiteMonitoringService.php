@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Jobs\AnalyzeMonitoringResultJob;
 use App\Models\MonitoringResult;
 use App\Models\Website;
+use App\Services\Ai\MonitoringAnalysisService;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
@@ -96,7 +98,13 @@ class WebsiteMonitoringService
             $result['response_time'] = (int) ((microtime(true) - $startTime) * 1000);
         }
 
-        return MonitoringResult::create($result);
+        $monitoringResult = MonitoringResult::create($result);
+
+        if (config('ai.auto_analyze') && app(MonitoringAnalysisService::class)->isEnabled()) {
+            AnalyzeMonitoringResultJob::dispatch($monitoringResult);
+        }
+
+        return $monitoringResult;
     }
 
     // -------------------------------------------------------------------------

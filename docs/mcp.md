@@ -17,6 +17,7 @@ Web Monitor includes an [MCP (Model Context Protocol)](https://modelcontextproto
 | `get-monitoring-history` | Recent results with uptime %; filter by website, status or hours back |
 | `get-latest-report` | Recent monitoring email reports and their summaries |
 | `run-monitoring` | Queues checks for one website or all active ones |
+| `analyze-website` | Runs AI analysis (severity, urgency, broken/hacked) on a website's latest result; see [ai-analysis.md](ai-analysis.md) |
 | `create-website` | Adds a website to monitor |
 | `update-website` | Changes a website; `is_active=false` pauses monitoring |
 | `delete-website` | Deletes a website and its monitoring results (marked destructive) |

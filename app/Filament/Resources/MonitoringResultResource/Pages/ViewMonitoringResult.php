@@ -3,11 +3,14 @@
 namespace App\Filament\Resources\MonitoringResultResource\Pages;
 
 use App\Filament\Actions\MonitoringActions;
+use App\Jobs\AnalyzeMonitoringResultJob;
 use App\Filament\Resources\MonitoringResultResource;
 use Filament\Actions;
 use Filament\Infolists\Components;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use App\Services\Ai\MonitoringAnalysisService;
 
 class ViewMonitoringResult extends ViewRecord
 {
@@ -60,6 +63,45 @@ class ViewMonitoringResult extends ViewRecord
                             }),
                     ])
                     ->columns(3),
+
+                Components\Section::make('AI Analysis')
+                    ->schema([
+                        Components\TextEntry::make('ai_severity')
+                            ->label('Severity')
+                            ->badge()
+                            ->color(fn(?string $state): string => MonitoringResultResource::severityColor($state)),
+                        Components\TextEntry::make('ai_urgency')
+                            ->label('Urgency')
+                            ->badge()
+                            ->formatStateUsing(fn(?string $state): string => str_replace('_', ' ', (string) $state)),
+                        Components\TextEntry::make('ai_analysis.category')
+                            ->label('Category')
+                            ->formatStateUsing(fn(?string $state): string => str_replace('_', ' ', (string) $state)),
+                        Components\IconEntry::make('ai_analysis.page_broken')
+                            ->label('Page Broken')
+                            ->boolean()
+                            ->trueColor('danger')
+                            ->falseColor('success'),
+                        Components\IconEntry::make('ai_analysis.compromised')
+                            ->label('Possibly Hacked')
+                            ->boolean()
+                            ->trueColor('danger')
+                            ->falseColor('success'),
+                        Components\TextEntry::make('ai_analyzed_at')
+                            ->label('Analyzed')
+                            ->since(),
+                        Components\TextEntry::make('ai_analysis.summary')
+                            ->label('Summary')
+                            ->columnSpanFull(),
+                        Components\TextEntry::make('ai_analysis.errors')
+                            ->label('Warnings')
+                            ->listWithLineBreaks()
+                            ->color('warning')
+                            ->visible(fn($record) => !empty($record->ai_analysis['errors']))
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(3)
+                    ->visible(fn($record) => $record->ai_analyzed_at !== null),
 
                 Components\Section::make('Screenshot')
                     ->schema([
@@ -203,6 +245,20 @@ class ViewMonitoringResult extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('analyze_with_ai')
+                ->label('Analyze with AI')
+                ->icon('heroicon-o-sparkles')
+                ->color('info')
+                ->visible(fn() => app(MonitoringAnalysisService::class)->isEnabled())
+                ->action(function ($record) {
+                    AnalyzeMonitoringResultJob::dispatch($record);
+
+                    Notification::make()
+                        ->title('AI analysis queued')
+                        ->body('Refresh this page in a moment to see the result.')
+                        ->success()
+                        ->send();
+                }),
             Actions\Action::make('recheck')
                 ->label('Recheck')
                 ->icon('heroicon-o-arrow-path')

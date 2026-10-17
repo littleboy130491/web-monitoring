@@ -21,6 +21,10 @@ class MonitoringResult extends Model
         'domain_expires_at',
         'domain_days_until_expiry',
         'scan_results',
+        'ai_severity',
+        'ai_urgency',
+        'ai_analysis',
+        'ai_analyzed_at',
         'checked_at',
     ];
 
@@ -33,6 +37,8 @@ class MonitoringResult extends Model
         'response_time' => 'integer',
         'domain_days_until_expiry' => 'integer',
         'scan_results' => 'array',
+        'ai_analysis' => 'array',
+        'ai_analyzed_at' => 'datetime',
     ];
 
     public function website(): BelongsTo

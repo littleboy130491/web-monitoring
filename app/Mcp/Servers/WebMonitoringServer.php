@@ -3,6 +3,7 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Resources\StatusOverviewResource;
+use App\Mcp\Tools\AnalyzeWebsiteTool;
 use App\Mcp\Tools\CreateWebsiteTool;
 use App\Mcp\Tools\DeleteWebsiteTool;
 use App\Mcp\Tools\GetLatestReportTool;
@@ -22,11 +23,12 @@ use Laravel\Mcp\Server\Attributes\Version;
 #[Instructions(<<<'MARKDOWN'
     This server exposes a website monitoring application. Each monitored website is checked
     for HTTP status, response time, SSL certificate, domain expiry, content changes and broken
-    assets. Results have a status of "up", "down", "error" or "warning".
+    assets, and may carry an AI severity (none/low/medium/high/critical). Results have a status of "up", "down", "error" or "warning".
 
     - Start with `get-status-summary` for an overview, or `list-websites` to find website IDs.
     - Use `get-website-status` and `get-monitoring-history` to drill into one website.
     - `run-monitoring` queues background checks; results appear a short while later.
+    - `analyze-website` asks the AI (Jev) for severity, urgency and whether the page looks broken or hacked.
     - `create-website`, `update-website` and `delete-website` manage the monitored websites.
     MARKDOWN)]
 class WebMonitoringServer extends Server
@@ -38,6 +40,7 @@ class WebMonitoringServer extends Server
         GetMonitoringHistoryTool::class,
         GetLatestReportTool::class,
         RunMonitoringTool::class,
+        AnalyzeWebsiteTool::class,
         CreateWebsiteTool::class,
         UpdateWebsiteTool::class,
         DeleteWebsiteTool::class,

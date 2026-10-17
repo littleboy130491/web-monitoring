@@ -71,6 +71,14 @@ class MonitoringResultResource extends Resource
                         default => 'gray',
                     })
                     ->searchable(),
+                Tables\Columns\TextColumn::make('ai_severity')
+                    ->label('AI Severity')
+                    ->badge()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->color(fn (?string $state): string => static::severityColor($state))
+                    ->icon(fn ($record): ?string => ($record->ai_analysis['compromised'] ?? false) ? 'heroicon-o-shield-exclamation' : null)
+                    ->tooltip(fn ($record): ?string => $record->ai_analysis['summary'] ?? null),
                 Tables\Columns\TextColumn::make('status_code')
                     ->badge()
                     ->color(fn (?int $state): string => match (true) {
@@ -198,6 +206,18 @@ class MonitoringResultResource extends Resource
                         'error' => 'Error',
                         'warning' => 'Warning',
                     ]),
+                Tables\Filters\SelectFilter::make('ai_severity')
+                    ->label('AI Severity')
+                    ->options([
+                        'critical' => 'Critical',
+                        'high' => 'High',
+                        'medium' => 'Medium',
+                        'low' => 'Low',
+                        'none' => 'None',
+                    ]),
+                Tables\Filters\Filter::make('ai_compromised')
+                    ->query(fn (Builder $query): Builder => $query->where('ai_analysis->compromised', true))
+                    ->label('AI: Possibly Hacked'),
                 Tables\Filters\Filter::make('has_screenshot')
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('screenshot_path'))
                     ->label('Has Screenshot'),
@@ -231,6 +251,17 @@ class MonitoringResultResource extends Resource
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    public static function severityColor(?string $severity): string
+    {
+        return match ($severity) {
+            'critical', 'high' => 'danger',
+            'medium' => 'warning',
+            'low' => 'info',
+            'none' => 'success',
+            default => 'gray',
+        };
     }
 
     public static function getRelations(): array
