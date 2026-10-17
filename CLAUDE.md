@@ -167,6 +167,7 @@ The app exposes an MCP (Model Context Protocol) server via `laravel/mcp`, so AI 
   - `create-website`, `update-website`, `delete-website` - manage monitored websites
 - **Resource**: `monitoring://status/overview` - same data as `get-status-summary`
 - **Tests**: `tests/Feature/WebMonitoringMcpServerTest.php`
+- **Full guide** (Claude Desktop/Code setup, troubleshooting): `docs/mcp.md`
 
 Example Claude Code / Claude Desktop config:
 ```json
