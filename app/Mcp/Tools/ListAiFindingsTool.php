@@ -51,7 +51,7 @@ class ListAiFindingsTool extends Tool
         $results = $query->latest('id')->limit(1000)->get()->filter(function (MonitoringResult $r) use ($validated, $minRank) {
             $analysis = $r->ai_analysis ?? [];
             $compromised = (bool) ($analysis['compromised'] ?? false);
-            $broken = (bool) ($analysis['page_broken'] ?? false);
+            $broken = (bool) ($analysis['page_broken'] ?? false) || (bool) ($analysis['layout_broken'] ?? false);
 
             if (! empty($validated['compromised_only'])) {
                 return $compromised;
@@ -96,7 +96,7 @@ class ListAiFindingsTool extends Tool
         return [
             'min_severity' => $schema->string()->enum(MonitoringAnalysisService::SEVERITIES)->description('Lowest severity to include (default medium). Hacked or broken findings are always included.'),
             'compromised_only' => $schema->boolean()->description('Only findings where the site looks hacked.'),
-            'broken_only' => $schema->boolean()->description('Only findings where the page looks broken.'),
+            'broken_only' => $schema->boolean()->description('Only findings where the page or its layout looks broken (e.g. stale Elementor CSS).'),
             'hours' => $schema->integer()->min(1)->max(8760)->description('Only analyses made within this many hours.'),
             'latest_only' => $schema->boolean()->description('Only each website\'s most recent analysis (default true). Set false to include older analyses.'),
             'limit' => $schema->integer()->min(1)->max(100)->description('Maximum findings to return (default 25).'),

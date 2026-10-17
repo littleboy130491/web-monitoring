@@ -13,13 +13,27 @@ Each monitoring result can be analyzed by AI to decide how severe and urgent the
    |---|---|---|
    | `severity` | score | none, low, medium, high, critical |
    | `urgency` | choice | immediate, today, this_week, none |
-   | `category` | choice | healthy, outage, performance, broken_page, broken_assets, content_change, compromised, expiry |
+   | `category` | choice | healthy, outage, performance, broken_page, broken_layout, broken_assets, content_change, compromised, expiry |
    | `page_broken` | noul (yes/no) | probability 0–1 |
+   | `layout_broken` | noul (yes/no) | probability 0–1 |
    | `compromised` | noul (yes/no) | probability 0–1 |
 
 3. **Result.** A page counts as broken or compromised when Jev's probability is at least 0.5 or the screenshot review says so. A likely compromise is always stored as **critical / immediate**.
 
 The outcome is stored on the monitoring result (`ai_severity`, `ai_urgency`, `ai_analysis`, `ai_analyzed_at`).
+
+## Broken layouts (e.g. Elementor CSS cache)
+
+A common failure is a page that loads fine (HTTP 200) but looks broken because its stylesheets are missing. On WordPress sites with Elementor, this usually happens after a cache plugin or CDN keeps serving old HTML that links to Elementor CSS files that have since been regenerated under new names. The files return 404 and sections render unstyled.
+
+How it's detected:
+
+- **Deep scan:** detects the page builder (Elementor, Divi, Oxygen, Beaver Builder, or plain WordPress) and checks page-builder CSS first among the 20 assets it tests. That way Elementor's `/wp-content/uploads/elementor/css/post-*.css` files are always checked.
+- **Jev:** gets `layout_signals` (page reachable, page builder, broken stylesheets and scripts, broken page-builder CSS URLs) and answers a dedicated `layout_broken` question.
+- **Screenshot review:** reports `layout_broken` with `layout_issues`, e.g. "sections stacked in one unstyled column".
+- **Result:** if either source says the layout is broken, the result is at least **high / today** with category `broken_layout`. When the evidence points to a known cause, `likely_cause` and `suggested_fix` are filled in. For missing Elementor CSS, the fix is: regenerate Elementor CSS (Elementor > Tools > Regenerate CSS & Data), then purge the page cache and CDN.
+
+The admin panel has an "AI: Broken Layout" filter; MCP's `list-ai-findings` with `broken_only=true` includes them.
 
 ## Setup
 
@@ -68,7 +82,7 @@ Screenshots are only taken with `--screenshot` (the scheduled run uses it), so a
   - `get-ai-analysis`: the stored analysis for one site or result, optionally with Jev's raw answers
   - `analyze-website`: runs a new analysis now
   - Other tools' results also include `ai_severity`, `ai_urgency`, `ai_compromised` and `ai_summary`.
-- **Notifications**: admins get a database notification when severity reaches `AI_NOTIFY_MIN_SEVERITY`, or whenever a site looks compromised.
+- **Notifications**: admins get a database notification when severity reaches `AI_NOTIFY_MIN_SEVERITY`, or whenever a site looks compromised. Broken layouts are titled "AI: Page Layout Broken" and include the suggested fix.
 
 ## Jev versions and 1.14
 

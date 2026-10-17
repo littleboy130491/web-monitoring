@@ -314,6 +314,82 @@ class MonitoringAnalysisTest extends TestCase
             ->assertSee('"latest_result_is_analyzed":false');
     }
 
+    public function test_reachable_page_with_stale_elementor_css_is_a_broken_layout(): void
+    {
+        config(['ai.jev.api_key' => 'jev-key']);
+
+        // Jev rates it low, but is confident the layout is broken
+        $answers = $this->jevAnswers(1);
+        $answers['answers']['layout_broken'] = ['type' => 'noul', 'noul' => 0.87];
+        $answers['answers']['category']['choice'] = 'broken_assets';
+        Http::fake(['api.typesafe.ai/*' => Http::response($answers)]);
+        $user = User::factory()->create();
+
+        $result = $this->makeResult(['scan_results' => [
+            'page_builder' => 'elementor',
+            'pages' => [],
+            'broken_assets' => [
+                ['type' => 'css', 'url' => 'https://example.com/wp-content/uploads/elementor/css/post-42.css', 'status' => 404],
+                ['type' => 'css', 'url' => 'https://example.com/wp-content/uploads/elementor/css/global.css', 'status' => 404],
+            ],
+            'any_significant_change' => false,
+        ]]);
+
+        $outcome = app(MonitoringAnalysisService::class)->analyze($result);
+
+        $this->assertTrue($outcome['layout_broken']);
+        $this->assertSame('high', $outcome['severity']);
+        $this->assertSame('today', $outcome['urgency']);
+        $this->assertSame('broken_layout', $outcome['category']);
+        $this->assertStringContainsString('Stale Elementor CSS cache', $outcome['likely_cause']);
+        $this->assertStringContainsString('Regenerate CSS & Data', $outcome['suggested_fix']);
+        $this->assertSame(2, $outcome['layout_signals']['broken_stylesheets']);
+        $this->assertStringContainsString('layout is broken', $outcome['summary']);
+
+        Http::assertSent(fn (Request $r) => $r['questions']['layout_broken']['type'] === 'noul'
+            && $r['state']['layout_signals']['page_builder'] === 'elementor'
+            && count($r['state']['layout_signals']['broken_page_builder_css']) === 2
+            && $r['state']['layout_signals']['page_reachable'] === true);
+
+        (new AnalyzeMonitoringResultJob($result))->handle(app(MonitoringAnalysisService::class));
+        $this->assertSame('AI: Page Layout Broken', $user->notifications()->first()->data['title']);
+
+        WebMonitoringServer::tool(ListAiFindingsTool::class, ['broken_only' => true])
+            ->assertOk()
+            ->assertSee(['"layout_broken":true', 'Regenerate CSS']);
+    }
+
+    public function test_vision_layout_findings_mark_layout_broken(): void
+    {
+        config(['ai.openrouter.api_key' => 'or-key']);
+        Http::fake([
+            'openrouter.ai/api/v1/chat/completions' => Http::response(['choices' => [['message' => ['content' => '```json'."\n".json_encode([
+                'page_broken' => false,
+                'layout_broken' => true,
+                'layout_issues' => ['sections stacked in one unstyled column', 'menu shown as a plain list'],
+                'compromised' => false,
+                'description' => 'Homepage text loads without styling.',
+            ])."\n```"]]]]),
+            'openrouter.ai/api/alpha/decisions' => Http::response($this->jevAnswers(0)),
+        ]);
+
+        $outcome = app(MonitoringAnalysisService::class)->analyze($this->makeResult($this->withScreenshot()));
+
+        $this->assertTrue($outcome['layout_broken']);
+        $this->assertSame('high', $outcome['severity']);
+        $this->assertStringContainsString('menu shown as a plain list', $outcome['summary']);
+        $this->assertNull($outcome['suggested_fix']);
+    }
+
+    public function test_page_builder_css_is_recognised(): void
+    {
+        $service = app(\App\Services\WebsiteMonitoringService::class);
+
+        $this->assertSame('elementor', $service->pageBuilderForUrl('https://x.test/wp-content/uploads/elementor/css/post-7.css?ver=1'));
+        $this->assertSame('divi', $service->pageBuilderForUrl('https://x.test/wp-content/et-cache/7/et-core.css'));
+        $this->assertNull($service->pageBuilderForUrl('https://x.test/wp-content/themes/astra/style.css'));
+    }
+
     public function test_score_level_parsing(): void
     {
         $this->assertSame(3, JevClient::scoreLevel(['probabilities' => [0.1, 0.1, 0.1, 0.6, 0.1]], 5));

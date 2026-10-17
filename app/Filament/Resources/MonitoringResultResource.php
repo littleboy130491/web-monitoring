@@ -215,6 +215,9 @@ class MonitoringResultResource extends Resource
                         'low' => 'Low',
                         'none' => 'None',
                     ]),
+                Tables\Filters\Filter::make('ai_layout_broken')
+                    ->query(fn (Builder $query): Builder => $query->where('ai_analysis->layout_broken', true))
+                    ->label('AI: Broken Layout'),
                 Tables\Filters\Filter::make('ai_compromised')
                     ->query(fn (Builder $query): Builder => $query->where('ai_analysis->compromised', true))
                     ->label('AI: Possibly Hacked'),

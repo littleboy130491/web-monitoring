@@ -88,6 +88,12 @@ class MonitoringAnalysisService
         }
 
         $analysis = $this->interpret($answers, $visual);
+
+        $signals = $this->layoutSignals($result, is_array($result->scan_results) ? $result->scan_results : []);
+        $cause = ($analysis['layout_broken'] || $signals['broken_page_builder_css']) ? $this->knownLayoutCause($signals) : null;
+        $analysis['layout_signals'] = $signals;
+        $analysis['likely_cause'] = $cause['likely_cause'] ?? null;
+        $analysis['suggested_fix'] = $cause['suggested_fix'] ?? null;
         $analysis['provider'] = $this->jev->provider();
         $analysis['model'] = $this->jev->lastModel ?? $this->jev->model();
         $analysis['screenshot_source'] = $visual ? 'vision_model' : ($images ? 'jev' : null);
@@ -135,6 +141,7 @@ class MonitoringAnalysisService
                     ->values()->all(),
                 'broken_assets' => collect($scan['broken_assets'] ?? [])->pluck('url')->take(10)->values()->all(),
             ],
+            'layout_signals' => $this->layoutSignals($result, $scan),
             'previous_statuses_newest_first' => $recent,
             // Untrusted: text scraped from the monitored page
             'page_text_excerpt' => $this->pageText($scan),
@@ -149,6 +156,63 @@ class MonitoringAnalysisService
         }
 
         return $state;
+    }
+
+    /**
+     * Signals that a page is reachable but its layout is broken, e.g. Elementor
+     * serving pages that reference per-page CSS files it has since deleted.
+     */
+    private function layoutSignals(MonitoringResult $result, array $scan): array
+    {
+        $broken = collect($scan['broken_assets'] ?? []);
+        $brokenCss = $broken->where('type', 'css');
+        $builder = app(\App\Services\WebsiteMonitoringService::class);
+
+        $builderCss = $brokenCss
+            ->filter(fn ($a) => $builder->pageBuilderForUrl($a['url'] ?? '') !== null)
+            ->pluck('url')
+            ->values();
+
+        return [
+            'page_reachable' => $result->status === 'up',
+            'page_builder' => $scan['page_builder'] ?? null,
+            'broken_stylesheets' => $brokenCss->count(),
+            'broken_scripts' => $broken->where('type', 'js')->count(),
+            'broken_page_builder_css' => $builderCss->take(10)->all(),
+        ];
+    }
+
+    /**
+     * A known cause and fix for a broken layout, when the evidence points to one.
+     *
+     * @return array{likely_cause: string, suggested_fix: string}|null
+     */
+    private function knownLayoutCause(array $signals): ?array
+    {
+        $builderCss = $signals['broken_page_builder_css'] ?? [];
+
+        if ($builderCss && collect($builderCss)->contains(fn ($u) => str_contains(strtolower($u), '/elementor/'))) {
+            return [
+                'likely_cause' => 'Stale Elementor CSS cache: the page links to Elementor-generated CSS files that no longer exist ('.count($builderCss).' returning 404), so sections render unstyled.',
+                'suggested_fix' => 'In WordPress admin go to Elementor > Tools > Regenerate CSS & Data (older versions: Regenerate Files & Data), then purge every page cache (caching plugin such as LiteSpeed Cache, WP Rocket or W3 Total Cache, and any CDN such as Cloudflare). If it keeps happening, check the cache plugin is not serving old HTML after Elementor regenerates its CSS, or set Elementor > Settings > Performance > CSS Print Method to "Internal Embedding".',
+            ];
+        }
+
+        if ($builderCss) {
+            return [
+                'likely_cause' => 'Page builder CSS cache is stale: generated CSS files return 404 ('.count($builderCss).').',
+                'suggested_fix' => 'Regenerate the page builder\'s CSS from its settings, then purge the site and CDN caches.',
+            ];
+        }
+
+        if (($signals['broken_stylesheets'] ?? 0) > 0) {
+            return [
+                'likely_cause' => 'One or more stylesheets return 404, so parts of the page render unstyled.',
+                'suggested_fix' => 'Check the missing stylesheet URLs: restore the files, fix the theme/plugin that references them, then purge site and CDN caches.',
+            ];
+        }
+
+        return null;
     }
 
     private function pageText(array $scan): ?string
@@ -201,7 +265,8 @@ class MonitoringAnalysisService
                     'healthy' => 'No issue.',
                     'outage' => 'Site is down, erroring or unreachable.',
                     'performance' => 'Site works but responds slowly.',
-                    'broken_page' => 'Site responds but the page is visibly broken: blank, unstyled, error text, collapsed layout, maintenance or parking page.',
+                    'broken_page' => 'Site responds but shows a blank page, error text, or a maintenance, default hosting or parking page instead of its content.',
+                    'broken_layout' => 'Site responds and its content is there, but the layout or styling is broken: unstyled text, stacked or overlapping sections, oversized images, missing header/menu styling, often because page builder (e.g. Elementor) or theme CSS fails to load.',
                     'broken_assets' => 'CSS, JavaScript or other assets fail to load.',
                     'content_change' => 'Content changed significantly but looks legitimate.',
                     'compromised' => 'Site appears hacked: defacement, injected spam, malicious redirects or phishing.',
@@ -214,6 +279,14 @@ class MonitoringAnalysisService
                 'criteria' => [
                     'true' => 'The page is broken: blank or error page, server/database/PHP error text, missing styling, collapsed layout, or a maintenance, default hosting or parking page.',
                     'false' => 'The page renders and reads normally.',
+                ],
+            ],
+            'layout_broken' => [
+                'type' => 'noul',
+                'instructions' => 'The site is reachable. Is its layout or styling broken even though the content loads?'.$evidence.' Broken stylesheets in layout_signals, especially page builder CSS such as Elementor\'s, are strong evidence.'.$guard,
+                'criteria' => [
+                    'true' => 'Content loads but the design is broken: plain unstyled text, sections stacked or overlapping, columns collapsed, images oversized or misplaced, header/menu/footer unstyled, or stylesheets the page depends on (theme or page builder CSS such as Elementor) return 404.',
+                    'false' => 'The page is styled and laid out as intended; any missing asset is minor and does not affect the design.',
                 ],
             ],
             'compromised' => [
@@ -237,11 +310,26 @@ class MonitoringAnalysisService
         $category = $answers['category']['choice'] ?? null;
         $brokenProbability = isset($answers['page_broken']) ? JevClient::noulProbability($answers['page_broken']) : null;
         $compromisedProbability = isset($answers['compromised']) ? JevClient::noulProbability($answers['compromised']) : null;
+        $layoutProbability = isset($answers['layout_broken']) ? JevClient::noulProbability($answers['layout_broken']) : null;
 
         $pageBroken = ($brokenProbability ?? 0) >= 0.5 || ($visual['page_broken'] ?? false);
         $compromised = ($compromisedProbability ?? 0) >= 0.5 || ($visual['compromised'] ?? false);
+        $layoutBroken = ($layoutProbability ?? 0) >= 0.5 || ($visual['layout_broken'] ?? false);
 
         $severity = $level !== null ? self::SEVERITIES[$level] : null;
+
+        // A reachable page with a broken layout is clearly affecting visitors
+        if ($layoutBroken) {
+            if (self::severityRank($severity) < self::severityRank('high')) {
+                $severity = 'high';
+            }
+            if (! in_array($urgency, ['immediate', 'today'], true)) {
+                $urgency = 'today';
+            }
+            if (in_array($category, [null, 'healthy', 'broken_assets', 'content_change', 'performance'], true)) {
+                $category = 'broken_layout';
+            }
+        }
 
         // A likely compromise is always treated as critical and immediate
         if ($compromised) {
@@ -256,15 +344,17 @@ class MonitoringAnalysisService
             'category' => $category,
             'page_broken' => $pageBroken,
             'page_broken_probability' => $brokenProbability,
+            'layout_broken' => $layoutBroken,
+            'layout_broken_probability' => $layoutProbability,
             'compromised' => $compromised,
             'compromised_probability' => $compromisedProbability,
-            'summary' => $this->summary($severity, $category, $pageBroken, $compromised, $visual),
+            'summary' => $this->summary($severity, $category, $pageBroken, $compromised, $visual, $layoutBroken),
             'screenshot_review' => $visual,
             'raw_answers' => $answers,
         ];
     }
 
-    private function summary(?string $severity, ?string $category, bool $broken, bool $compromised, ?array $visual): string
+    private function summary(?string $severity, ?string $category, bool $broken, bool $compromised, ?array $visual, bool $layoutBroken = false): string
     {
         $parts = [ucfirst($severity ?? 'unknown').' severity'];
 
@@ -274,6 +364,8 @@ class MonitoringAnalysisService
 
         if ($compromised) {
             $parts[] = 'possible compromise'.(! empty($visual['compromise_indicators']) ? ': '.implode(', ', $visual['compromise_indicators']) : '');
+        } elseif ($layoutBroken) {
+            $parts[] = 'page loads but its layout is broken'.(! empty($visual['layout_issues']) ? ': '.implode(', ', $visual['layout_issues']) : '');
         } elseif ($broken) {
             $parts[] = 'page looks broken'.(! empty($visual['broken_reasons']) ? ': '.implode(', ', $visual['broken_reasons']) : '');
         }

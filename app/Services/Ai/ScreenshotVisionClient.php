@@ -13,11 +13,17 @@ class ScreenshotVisionClient
 {
     private const PROMPT = <<<'PROMPT'
         You are reviewing a screenshot of a monitored website for its owner.
-        Decide whether the page is broken and whether it shows signs of being hacked.
+        Decide whether the page is broken, whether its layout is broken, and whether it shows
+        signs of being hacked.
 
-        Broken: blank or white page, server or database error, PHP/stack trace, missing CSS
-        (unstyled text), collapsed or overlapping layout, missing images everywhere,
+        Broken: blank or white page, server or database error, PHP/stack trace,
         "under maintenance" or default hosting/parking page, browser security warning.
+
+        Layout broken: the content loads but the design does not: plain unstyled text in
+        browser default fonts, sections stacked in one column or overlapping, oversized or
+        misplaced images, unstyled header/menu/footer, buttons shown as plain links, large
+        empty gaps. On WordPress sites built with Elementor or another page builder this
+        usually means the builder's CSS failed to load.
 
         Hacked: defacement ("hacked by", political or hacker messages), injected spam
         (pharma, casino, gambling, adult, crypto, loan), unexpected foreign-language spam,
@@ -30,6 +36,8 @@ class ScreenshotVisionClient
         {
           "page_broken": true|false,
           "broken_reasons": ["..."],
+          "layout_broken": true|false,
+          "layout_issues": ["..."],
           "compromised": true|false,
           "compromise_indicators": ["..."],
           "description": "one or two sentences describing what the page shows",
@@ -43,7 +51,7 @@ class ScreenshotVisionClient
     }
 
     /**
-     * @return array{page_broken: bool, broken_reasons: array, compromised: bool, compromise_indicators: array, description: ?string, confidence: ?float, model: string}
+     * @return array{page_broken: bool, broken_reasons: array, layout_broken: bool, layout_issues: array, compromised: bool, compromise_indicators: array, description: ?string, confidence: ?float, model: string}
      */
     public function analyze(string $imagePath, string $siteUrl, ?string $siteDescription = null): array
     {
@@ -84,6 +92,8 @@ class ScreenshotVisionClient
         return [
             'page_broken' => (bool) ($data['page_broken'] ?? false),
             'broken_reasons' => array_values((array) ($data['broken_reasons'] ?? [])),
+            'layout_broken' => (bool) ($data['layout_broken'] ?? false),
+            'layout_issues' => array_values((array) ($data['layout_issues'] ?? [])),
             'compromised' => (bool) ($data['compromised'] ?? false),
             'compromise_indicators' => array_values((array) ($data['compromise_indicators'] ?? [])),
             'description' => isset($data['description']) ? (string) $data['description'] : null,
