@@ -34,4 +34,11 @@ return [
         'intval',
         explode(',', env('MONITORING_REPORT_MAIL_RETRY_BACKOFF', '5,15'))
     ),
+
+    /*
+     | Bearer token required by the HTTP MCP endpoint (/mcp).
+     | Leave MCP_TOKEN empty to disable the HTTP endpoint; the local
+     | stdio server (php artisan mcp:start web-monitoring) is unaffected.
+     */
+    'mcp_token' => env('MCP_TOKEN'),
 ];

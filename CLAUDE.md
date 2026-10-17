@@ -150,6 +150,36 @@ Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome via queue j
 - **Color coding**: Success (green), danger (red), info (blue), warning (yellow)
 - **Rich icons**: Contextual Heroicons for each notification type
 
+## MCP Server
+
+The app exposes an MCP (Model Context Protocol) server via `laravel/mcp`, so AI clients (Claude Desktop, Claude Code, etc.) can query and manage monitoring.
+
+- **Server**: `app/Mcp/Servers/WebMonitoringServer.php`, registered in `routes/ai.php`
+- **Local (stdio)**: `php artisan mcp:start web-monitoring`
+- **Remote (HTTP)**: `POST /mcp` with `Authorization: Bearer <MCP_TOKEN>`; disabled (404) when `MCP_TOKEN` is empty
+- **Tools** (`app/Mcp/Tools/`):
+  - `get-status-summary` - status counts, average response time, sites needing attention
+  - `list-websites` - websites with latest result (filter by search, is_active, status)
+  - `get-website-status` - full latest result for one website (by id or url)
+  - `get-monitoring-history` - recent results with uptime % (filter by website, status, hours)
+  - `get-latest-report` - recent monitoring email reports and their summaries
+  - `run-monitoring` - queue `MonitorWebsiteJob`s for one or all active websites (needs a queue worker)
+  - `create-website`, `update-website`, `delete-website` - manage monitored websites
+- **Resource**: `monitoring://status/overview` - same data as `get-status-summary`
+- **Tests**: `tests/Feature/WebMonitoringMcpServerTest.php`
+
+Example Claude Code / Claude Desktop config:
+```json
+{
+  "mcpServers": {
+    "web-monitoring": {
+      "command": "php",
+      "args": ["/path/to/web-monitoring/artisan", "mcp:start", "web-monitoring"]
+    }
+  }
+}
+```
+
 ## Web Interface
 
 ### Admin Panel (Filament PHP)
