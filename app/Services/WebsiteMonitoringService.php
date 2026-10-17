@@ -145,6 +145,7 @@ class WebsiteMonitoringService
 
         return [
             'pages' => $pages,
+            'page_builder' => $this->detectPageBuilder($mainHtml),
             'broken_assets' => $brokenAssets,
             'any_significant_change' => collect($pages)->contains('significant', true),
             'has_broken_assets' => count($brokenAssets) > 0,
@@ -302,6 +303,10 @@ class WebsiteMonitoringService
             }
         }
 
+        // Check page-builder CSS first (stale Elementor CSS is a common cause of
+        // broken layouts), then other stylesheets, then scripts
+        usort($assetsToCheck, fn ($a, $b) => $this->assetPriority($a) <=> $this->assetPriority($b));
+
         foreach (array_slice($assetsToCheck, 0, self::MAX_ASSET_CHECKS) as $asset) {
             try {
                 $response = $this->client->head($asset['url'], [
@@ -322,6 +327,47 @@ class WebsiteMonitoringService
         }
 
         return $broken;
+    }
+
+    private function assetPriority(array $asset): int
+    {
+        if ($asset['type'] === 'css' && $this->pageBuilderForUrl($asset['url'])) {
+            return 0;
+        }
+
+        return $asset['type'] === 'css' ? 1 : 2;
+    }
+
+    /**
+     * Page builder that generated an asset URL, e.g. Elementor's per-page CSS
+     * in /wp-content/uploads/elementor/css/.
+     */
+    public function pageBuilderForUrl(string $url): ?string
+    {
+        $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+
+        return match (true) {
+            str_contains($path, '/elementor/') => 'elementor',
+            str_contains($path, '/et-cache/') || str_contains($path, '/divi') => 'divi',
+            str_contains($path, '/oxygen/') => 'oxygen',
+            str_contains($path, '/bb-plugin/') => 'beaver_builder',
+            default => null,
+        };
+    }
+
+    /**
+     * Detect the page builder used by a page from its HTML.
+     */
+    private function detectPageBuilder(string $html): ?string
+    {
+        return match (true) {
+            str_contains($html, 'elementor-') || str_contains($html, '/elementor/') => 'elementor',
+            str_contains($html, 'et_pb_') || str_contains($html, 'et-cache') => 'divi',
+            str_contains($html, 'ct-section') || str_contains($html, '/oxygen/') => 'oxygen',
+            str_contains($html, 'fl-builder') => 'beaver_builder',
+            str_contains($html, 'wp-content/') => 'wordpress',
+            default => null,
+        };
     }
 
     // -------------------------------------------------------------------------

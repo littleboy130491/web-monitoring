@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Jobs\AnalyzeMonitoringResultJob;
 use App\Mcp\Servers\WebMonitoringServer;
 use App\Mcp\Tools\AnalyzeWebsiteTool;
+use App\Mcp\Tools\GetAiAnalysisTool;
+use App\Mcp\Tools\ListAiFindingsTool;
 use App\Models\MonitoringResult;
 use App\Models\User;
 use App\Models\Website;
@@ -61,7 +63,7 @@ class MonitoringAnalysisTest extends TestCase
         ], $overrides));
     }
 
-    private function withScreenshot(): array
+    private function withScreenshot(int $width = 1280, int $height = 720): array
     {
         $relative = 'screenshots/test_'.uniqid().'.jpg';
         $this->screenshot = storage_path('app/public/'.$relative);
@@ -70,7 +72,9 @@ class MonitoringAnalysisTest extends TestCase
             mkdir(dirname($this->screenshot), 0755, true);
         }
 
-        file_put_contents($this->screenshot, "\xFF\xD8\xFF\xE0fake-jpeg");
+        $image = imagecreatetruecolor($width, $height);
+        imagejpeg($image, $this->screenshot, 70);
+        imagedestroy($image);
 
         return ['screenshot_path' => $relative];
     }
@@ -155,6 +159,43 @@ class MonitoringAnalysisTest extends TestCase
             && $r['state']['screenshot_review']['compromised'] === true);
     }
 
+    public function test_jev_image_input_uses_documented_asset_format(): void
+    {
+        config(['ai.jev.api_key' => 'jev-key', 'ai.jev.images' => true, 'ai.jev.model' => 'jev-latest']);
+        Http::fake(['api.typesafe.ai/*' => Http::response(['model' => 'jev-1.14.0'] + $this->jevAnswers(0))]);
+
+        $result = $this->makeResult($this->withScreenshot());
+        $outcome = app(MonitoringAnalysisService::class)->analyze($result);
+
+        $this->assertSame('jev', $outcome['screenshot_source']);
+        $this->assertSame('jev-1.14.0', $outcome['model']);
+        $this->assertSame([], $outcome['errors']);
+
+        Http::assertSent(function (Request $r) {
+            $asset = $r['assets']['screenshot-image'] ?? [];
+
+            return $r->hasHeader('TypeSafe-Danger-Zone-Images', 'true')
+                && $asset['type'] === 'image'
+                && $asset['format'] === 'jpg'
+                && base64_decode($asset['data_base64'], true) !== false
+                && ! str_starts_with($asset['data_base64'], 'data:');
+        });
+    }
+
+    public function test_jev_image_input_skips_images_outside_size_limits(): void
+    {
+        config(['ai.jev.api_key' => 'jev-key', 'ai.jev.images' => true]);
+        Http::fake(['api.typesafe.ai/*' => Http::response($this->jevAnswers(0))]);
+
+        $result = $this->makeResult($this->withScreenshot(2000, 720));
+        $outcome = app(MonitoringAnalysisService::class)->analyze($result);
+
+        $this->assertNull($outcome['screenshot_source']);
+        $this->assertStringContainsString('256-1568 px', $outcome['errors'][0]);
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $r) => ! isset($r['assets']));
+    }
+
     public function test_jev_image_input_sends_assets_and_falls_back_to_text_when_rejected(): void
     {
         config(['ai.jev.api_key' => 'jev-key', 'ai.jev.images' => true]);
@@ -216,6 +257,137 @@ class MonitoringAnalysisTest extends TestCase
         WebMonitoringServer::tool(AnalyzeWebsiteTool::class, ['website_id' => $result->website_id])
             ->assertOk()
             ->assertSee(['"severity":"medium"', 'example.com']);
+    }
+
+    public function test_mcp_reads_stored_analyses(): void
+    {
+        config(['ai.jev.api_key' => 'jev-key']);
+        $hacked = $this->makeResult();
+        $hacked->update([
+            'ai_severity' => 'critical',
+            'ai_urgency' => 'immediate',
+            'ai_analyzed_at' => now(),
+            'ai_analysis' => [
+                'severity' => 'critical',
+                'compromised' => true,
+                'page_broken' => false,
+                'summary' => 'Critical severity - compromised - casino spam.',
+                'raw_answers' => ['compromised' => ['type' => 'noul', 'noul' => 0.94]],
+            ],
+        ]);
+
+        $healthySite = Website::create(['url' => 'https://ok.example.com', 'is_active' => true, 'check_interval' => 3600]);
+        MonitoringResult::create([
+            'website_id' => $healthySite->id,
+            'status' => 'up',
+            'checked_at' => now(),
+            'ai_severity' => 'none',
+            'ai_urgency' => 'none',
+            'ai_analyzed_at' => now(),
+            'ai_analysis' => ['severity' => 'none', 'compromised' => false, 'page_broken' => false, 'summary' => 'None severity.'],
+        ]);
+
+        WebMonitoringServer::tool(ListAiFindingsTool::class)
+            ->assertOk()
+            ->assertSee(['"count":1', 'casino spam', '"websites_with_analysis":2'])
+            ->assertDontSee('ok.example.com');
+
+        WebMonitoringServer::tool(ListAiFindingsTool::class, ['min_severity' => 'none'])
+            ->assertOk()
+            ->assertSee(['"count":2', 'ok.example.com']);
+
+        WebMonitoringServer::tool(GetAiAnalysisTool::class, ['url' => 'https://example.com', 'include_raw' => true])
+            ->assertOk()
+            ->assertSee(['"severity":"critical"', '"latest_result_is_analyzed":true', '"noul":0.94']);
+
+        WebMonitoringServer::tool(GetAiAnalysisTool::class, ['id' => $hacked->website_id])
+            ->assertOk()
+            ->assertDontSee('raw_answers');
+
+        $unanalyzed = MonitoringResult::create(['website_id' => $healthySite->id, 'status' => 'up', 'checked_at' => now()]);
+
+        WebMonitoringServer::tool(GetAiAnalysisTool::class, ['result_id' => $unanalyzed->id])
+            ->assertHasErrors(['has not been analyzed yet']);
+
+        WebMonitoringServer::tool(GetAiAnalysisTool::class, ['id' => $healthySite->id])
+            ->assertOk()
+            ->assertSee('"latest_result_is_analyzed":false');
+    }
+
+    public function test_reachable_page_with_stale_elementor_css_is_a_broken_layout(): void
+    {
+        config(['ai.jev.api_key' => 'jev-key']);
+
+        // Jev rates it low, but is confident the layout is broken
+        $answers = $this->jevAnswers(1);
+        $answers['answers']['layout_broken'] = ['type' => 'noul', 'noul' => 0.87];
+        $answers['answers']['category']['choice'] = 'broken_assets';
+        Http::fake(['api.typesafe.ai/*' => Http::response($answers)]);
+        $user = User::factory()->create();
+
+        $result = $this->makeResult(['scan_results' => [
+            'page_builder' => 'elementor',
+            'pages' => [],
+            'broken_assets' => [
+                ['type' => 'css', 'url' => 'https://example.com/wp-content/uploads/elementor/css/post-42.css', 'status' => 404],
+                ['type' => 'css', 'url' => 'https://example.com/wp-content/uploads/elementor/css/global.css', 'status' => 404],
+            ],
+            'any_significant_change' => false,
+        ]]);
+
+        $outcome = app(MonitoringAnalysisService::class)->analyze($result);
+
+        $this->assertTrue($outcome['layout_broken']);
+        $this->assertSame('high', $outcome['severity']);
+        $this->assertSame('today', $outcome['urgency']);
+        $this->assertSame('broken_layout', $outcome['category']);
+        $this->assertStringContainsString('Stale Elementor CSS cache', $outcome['likely_cause']);
+        $this->assertStringContainsString('Regenerate CSS & Data', $outcome['suggested_fix']);
+        $this->assertSame(2, $outcome['layout_signals']['broken_stylesheets']);
+        $this->assertStringContainsString('layout is broken', $outcome['summary']);
+
+        Http::assertSent(fn (Request $r) => $r['questions']['layout_broken']['type'] === 'noul'
+            && $r['state']['layout_signals']['page_builder'] === 'elementor'
+            && count($r['state']['layout_signals']['broken_page_builder_css']) === 2
+            && $r['state']['layout_signals']['page_reachable'] === true);
+
+        (new AnalyzeMonitoringResultJob($result))->handle(app(MonitoringAnalysisService::class));
+        $this->assertSame('AI: Page Layout Broken', $user->notifications()->first()->data['title']);
+
+        WebMonitoringServer::tool(ListAiFindingsTool::class, ['broken_only' => true])
+            ->assertOk()
+            ->assertSee(['"layout_broken":true', 'Regenerate CSS']);
+    }
+
+    public function test_vision_layout_findings_mark_layout_broken(): void
+    {
+        config(['ai.openrouter.api_key' => 'or-key']);
+        Http::fake([
+            'openrouter.ai/api/v1/chat/completions' => Http::response(['choices' => [['message' => ['content' => '```json'."\n".json_encode([
+                'page_broken' => false,
+                'layout_broken' => true,
+                'layout_issues' => ['sections stacked in one unstyled column', 'menu shown as a plain list'],
+                'compromised' => false,
+                'description' => 'Homepage text loads without styling.',
+            ])."\n```"]]]]),
+            'openrouter.ai/api/alpha/decisions' => Http::response($this->jevAnswers(0)),
+        ]);
+
+        $outcome = app(MonitoringAnalysisService::class)->analyze($this->makeResult($this->withScreenshot()));
+
+        $this->assertTrue($outcome['layout_broken']);
+        $this->assertSame('high', $outcome['severity']);
+        $this->assertStringContainsString('menu shown as a plain list', $outcome['summary']);
+        $this->assertNull($outcome['suggested_fix']);
+    }
+
+    public function test_page_builder_css_is_recognised(): void
+    {
+        $service = app(\App\Services\WebsiteMonitoringService::class);
+
+        $this->assertSame('elementor', $service->pageBuilderForUrl('https://x.test/wp-content/uploads/elementor/css/post-7.css?ver=1'));
+        $this->assertSame('divi', $service->pageBuilderForUrl('https://x.test/wp-content/et-cache/7/et-core.css'));
+        $this->assertNull($service->pageBuilderForUrl('https://x.test/wp-content/themes/astra/style.css'));
     }
 
     public function test_score_level_parsing(): void

@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Http;
  */
 class JevClient
 {
+    /** Model reported by the last successful decision call */
+    public ?string $lastModel = null;
+
     /**
      * The provider that will answer decisions: "jev", "openrouter" or null when
      * no key is configured.
@@ -26,6 +29,18 @@ class JevClient
             'jev' => $hasJev ? 'jev' : null,
             'openrouter' => $hasOpenRouter ? 'openrouter' : null,
             default => $hasJev ? 'jev' : ($hasOpenRouter ? 'openrouter' : null),
+        };
+    }
+
+    /**
+     * The Jev model the current provider will be asked for.
+     */
+    public function model(): ?string
+    {
+        return match ($this->provider()) {
+            'jev' => config('ai.jev.model'),
+            'openrouter' => config('ai.openrouter.decision_model'),
+            default => null,
         };
     }
 
@@ -98,6 +113,9 @@ class JevClient
             throw new AiAnalysisException("Jev response via {$provider} had no answers.");
         }
 
+        // The resolved version, e.g. jev-1.14.0 when jev-latest was requested
+        $this->lastModel = $response->json('model') ?: $model;
+
         return $answers;
     }
 
@@ -110,8 +128,9 @@ class JevClient
     }
 
     /**
-     * Encode an image for the request's `assets` map. TypeSafe accepts still
-     * PNG or JPEG, 256-1568 px per side, up to 16 MiB.
+     * Encode an image for the request's `assets` map, as documented at
+     * docs.typesafe.ai/images: {type: "image", format, data_base64}. TypeSafe
+     * accepts still PNG or JPEG, 256-1568 px per side, up to 16 MiB.
      */
     public static function imageAsset(string $path): array
     {
@@ -119,10 +138,25 @@ class JevClient
             throw new AiAnalysisException("Image not found: {$path}");
         }
 
+        $format = match (mime_content_type($path)) {
+            'image/png' => 'png',
+            'image/jpeg' => 'jpg',
+            default => throw new AiAnalysisException("Jev only accepts PNG or JPEG images: {$path}"),
+        };
+
+        if (filesize($path) > 16 * 1024 * 1024) {
+            throw new AiAnalysisException("Image is larger than Jev's 16 MiB limit: {$path}");
+        }
+
+        $size = @getimagesize($path);
+        if ($size && (min($size[0], $size[1]) < 256 || max($size[0], $size[1]) > 1568)) {
+            throw new AiAnalysisException("Image is {$size[0]}x{$size[1]}; Jev needs 256-1568 px per side: {$path}");
+        }
+
         return [
             'type' => 'image',
-            'media_type' => mime_content_type($path) ?: 'image/jpeg',
-            'data' => base64_encode(file_get_contents($path)),
+            'format' => $format,
+            'data_base64' => base64_encode(file_get_contents($path)),
         ];
     }
 

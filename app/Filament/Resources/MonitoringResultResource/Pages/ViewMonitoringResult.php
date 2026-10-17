@@ -82,6 +82,11 @@ class ViewMonitoringResult extends ViewRecord
                             ->boolean()
                             ->trueColor('danger')
                             ->falseColor('success'),
+                        Components\IconEntry::make('ai_analysis.layout_broken')
+                            ->label('Layout Broken')
+                            ->boolean()
+                            ->trueColor('danger')
+                            ->falseColor('success'),
                         Components\IconEntry::make('ai_analysis.compromised')
                             ->label('Possibly Hacked')
                             ->boolean()
@@ -92,6 +97,15 @@ class ViewMonitoringResult extends ViewRecord
                             ->since(),
                         Components\TextEntry::make('ai_analysis.summary')
                             ->label('Summary')
+                            ->columnSpanFull(),
+                        Components\TextEntry::make('ai_analysis.likely_cause')
+                            ->label('Likely Cause')
+                            ->visible(fn($record) => !empty($record->ai_analysis['likely_cause']))
+                            ->columnSpanFull(),
+                        Components\TextEntry::make('ai_analysis.suggested_fix')
+                            ->label('Suggested Fix')
+                            ->color('info')
+                            ->visible(fn($record) => !empty($record->ai_analysis['suggested_fix']))
                             ->columnSpanFull(),
                         Components\TextEntry::make('ai_analysis.errors')
                             ->label('Warnings')

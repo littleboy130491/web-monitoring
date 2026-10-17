@@ -17,10 +17,23 @@ Web Monitor includes an [MCP (Model Context Protocol)](https://modelcontextproto
 | `get-monitoring-history` | Recent results with uptime %; filter by website, status or hours back |
 | `get-latest-report` | Recent monitoring email reports and their summaries |
 | `run-monitoring` | Queues checks for one website or all active ones |
+| `list-ai-findings` | AI findings across all sites, most severe first; filter by minimum severity, hacked only, broken only, hours |
+| `get-ai-analysis` | Stored AI analysis for one website or result, optionally with Jev's raw answers |
 | `analyze-website` | Runs AI analysis (severity, urgency, broken/hacked) on a website's latest result; see [ai-analysis.md](ai-analysis.md) |
+| `get-error-log` | Recent errors from the Laravel log (`storage/logs`): exception, file, line and app stack frames, repeated errors grouped with a count, secrets redacted |
+| `list-failed-jobs` | Failed queue jobs with their exception and app stack frames |
+| `get-source-snippet` | Lines of the app's code around a file and line (only `app`, `config`, `routes`, `database`, `resources/views`, `tests`; never `.env`) |
 | `create-website` | Adds a website to monitor |
 | `update-website` | Changes a website; `is_active=false` pauses monitoring |
 | `delete-website` | Deletes a website and its monitoring results (marked destructive) |
+
+### Prompt
+
+`diagnose-errors` (arguments: `hours`, `focus`) tells the agent to read the error log and failed jobs, look at the failing code, and recommend a fix for each error with a way to confirm it. In Claude Desktop, pick it from the prompts menu (the + / attach button); or just ask "check the error log and recommend fixes".
+
+### Example questions
+
+Example questions for your AI agent: "Any errors in the app today? How do I fix them?", "Why did the AnalyzeMonitoringResultJob fail?", "What did the AI find today?", "Is any of my sites hacked?", "Show me the AI analysis for example.com and Jev's raw answers".
 
 The server also offers a read-only resource, `monitoring://status/overview`, with the same data as `get-status-summary`.
 

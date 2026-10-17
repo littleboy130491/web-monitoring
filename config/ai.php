@@ -24,11 +24,13 @@ return [
     'jev' => [
         'api_key' => env('JEV_API_KEY'),
         'url' => env('JEV_API_URL', 'https://api.typesafe.ai/v1/systemone'),
+        // jev-latest is an alias that moves to new versions (1.13 -> 1.14 around
+        // 2026-10-21); pin e.g. jev-1.14.0 in production for stable probabilities.
         'model' => env('JEV_MODEL', 'jev-latest'),
 
-        // Send screenshots to Jev directly (experimental in Jev 1.13/1.14, needs a
-        // model that accepts images, e.g. jev-preview). Used only when no OpenRouter
-        // vision model is available; falls back to text-only if Jev rejects it.
+        // Send screenshots to Jev directly (experimental "danger zone" feature of
+        // Jev 1.13 and 1.14). Used only when no OpenRouter vision model is
+        // available; falls back to text-only if Jev rejects it.
         'images' => (bool) env('JEV_IMAGES', false),
     ],
 

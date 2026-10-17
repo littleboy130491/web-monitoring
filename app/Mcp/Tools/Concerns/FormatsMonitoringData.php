@@ -55,6 +55,45 @@ trait FormatsMonitoringData
         return $data;
     }
 
+    protected function formatAnalysis(MonitoringResult $result, bool $includeRaw = false): array
+    {
+        $analysis = $result->ai_analysis ?? [];
+
+        $data = [
+            'result_id' => $result->id,
+            'website_id' => $result->website_id,
+            'url' => $result->website?->url,
+            'checked_at' => $result->checked_at?->toIso8601String(),
+            'analyzed_at' => $result->ai_analyzed_at?->toIso8601String(),
+            'check_status' => $result->status,
+            'severity' => $result->ai_severity,
+            'severity_confidence' => $analysis['severity_confidence'] ?? null,
+            'urgency' => $result->ai_urgency,
+            'category' => $analysis['category'] ?? null,
+            'page_broken' => $analysis['page_broken'] ?? null,
+            'page_broken_probability' => $analysis['page_broken_probability'] ?? null,
+            'layout_broken' => $analysis['layout_broken'] ?? null,
+            'layout_broken_probability' => $analysis['layout_broken_probability'] ?? null,
+            'compromised' => $analysis['compromised'] ?? null,
+            'compromised_probability' => $analysis['compromised_probability'] ?? null,
+            'summary' => $analysis['summary'] ?? null,
+            'likely_cause' => $analysis['likely_cause'] ?? null,
+            'suggested_fix' => $analysis['suggested_fix'] ?? null,
+            'layout_signals' => $analysis['layout_signals'] ?? null,
+            'screenshot_review' => $analysis['screenshot_review'] ?? null,
+            'screenshot_source' => $analysis['screenshot_source'] ?? null,
+            'provider' => $analysis['provider'] ?? null,
+            'model' => $analysis['model'] ?? null,
+            'warnings' => $analysis['errors'] ?? [],
+        ];
+
+        if ($includeRaw) {
+            $data['raw_answers'] = $analysis['raw_answers'] ?? null;
+        }
+
+        return $data;
+    }
+
     protected function findWebsite(int|string|null $id, ?string $url = null): ?Website
     {
         if ($id !== null && $id !== '') {

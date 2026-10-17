@@ -45,14 +45,18 @@ class AnalyzeMonitoringResultJob implements ShouldQueue
         }
 
         $url = $this->result->website->url;
-        $title = $outcome['compromised']
-            ? 'AI: Website May Be Compromised'
-            : 'AI: '.ucfirst($outcome['severity']).' Severity Issue';
+        $title = match (true) {
+            $outcome['compromised'] => 'AI: Website May Be Compromised',
+            $outcome['layout_broken'] ?? false => 'AI: Page Layout Broken',
+            default => 'AI: '.ucfirst($outcome['severity']).' Severity Issue',
+        };
+
+        $body = "{$url}: {$outcome['summary']}".(! empty($outcome['suggested_fix']) ? " Fix: {$outcome['suggested_fix']}" : '');
 
         foreach (User::all() as $user) {
             Notification::make()
                 ->title($title)
-                ->body("{$url}: {$outcome['summary']}")
+                ->body($body)
                 ->icon($outcome['compromised'] ? 'heroicon-o-shield-exclamation' : 'heroicon-o-sparkles')
                 ->color($outcome['severity'] === 'critical' ? 'danger' : 'warning')
                 ->sendToDatabase($user);
