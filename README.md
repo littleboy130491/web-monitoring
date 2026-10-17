@@ -187,6 +187,19 @@ The application automatically schedules:
 - **Data pruning**: Once daily
 
 
+## MCP Server (AI Integration)
+
+Web Monitor includes an MCP server so AI clients such as Claude Desktop and Claude Code can check website status, view history and reports, queue monitoring runs and manage websites.
+
+```bash
+# Local (stdio)
+php artisan mcp:start web-monitoring
+```
+
+Over HTTP, the server is at `POST /mcp` and needs `Authorization: Bearer <MCP_TOKEN>`. It stays off until `MCP_TOKEN` is set in `.env`.
+
+See [docs/mcp.md](docs/mcp.md) for the tool list and setup steps for Claude Desktop and Claude Code.
+
 ## Configuration
 
 ### Environment Variables
@@ -197,6 +210,9 @@ QUEUE_CONNECTION=database
 # Database (SQLite default)
 DB_CONNECTION=sqlite
 DB_DATABASE=/absolute/path/to/database.sqlite
+
+# Bearer token for the HTTP MCP endpoint (empty disables it)
+MCP_TOKEN=
 
 ```
 
