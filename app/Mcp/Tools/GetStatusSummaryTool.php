@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('get-status-summary')]
-#[Description('Get an overall health summary: counts of websites by latest status, average response time, and websites that need attention (down/error/warning, domain or SSL expiring within 14 days, broken assets).')]
+#[Description('Get an overall health summary: counts of websites by latest status, average response time, and websites that need attention (down/error/warning, domain or SSL expiring within 14 days, broken assets, AI-flagged high/critical severity or possible compromise).')]
 #[IsReadOnly]
 class GetStatusSummaryTool extends Tool
 {
@@ -61,6 +61,12 @@ class GetStatusSummaryTool extends Tool
             $brokenAssets = count($result->scan_results['broken_assets'] ?? []);
             if ($brokenAssets > 0) {
                 $reasons[] = "{$brokenAssets} broken asset(s)";
+            }
+
+            if ($result->ai_analysis['compromised'] ?? false) {
+                $reasons[] = 'AI flagged a possible compromise';
+            } elseif (in_array($result->ai_severity, ['high', 'critical'], true)) {
+                $reasons[] = "AI severity {$result->ai_severity}";
             }
 
             if ($reasons) {

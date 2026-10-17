@@ -187,6 +187,22 @@ The application automatically schedules:
 - **Data pruning**: Once daily
 
 
+## AI Analysis
+
+Monitoring results can be analyzed by AI using [Jev](https://typesafe.ai), TypeSafe's decision model. It rates **severity** (none to critical) and **urgency**, names the main issue, and checks whether the page looks **broken** or **hacked**. With an OpenRouter key, a vision model also reads the screenshot.
+
+```env
+JEV_API_KEY=          # TypeSafe (Jev) directly
+OPENROUTER_API_KEY=   # Jev via OpenRouter + screenshot reading
+```
+
+```bash
+php artisan migrate
+php artisan monitor:analyze   # analyze the latest results now
+```
+
+Analyses also run automatically after each check (queue worker needed) and show in the admin panel. See [docs/ai-analysis.md](docs/ai-analysis.md).
+
 ## MCP Server (AI Integration)
 
 Web Monitor includes an MCP server so AI clients such as Claude Desktop and Claude Code can check website status, view history and reports, queue monitoring runs and manage websites.

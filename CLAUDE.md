@@ -50,6 +50,11 @@ Note: The `composer dev-simple` command is recommended for stable operation, as 
 - **Data Pruning**: Automatically runs daily to clean old monitoring data
 - **Run scheduler**: `php artisan schedule:work` (for development) or configure cron job for production
 
+### AI Analysis Commands
+- **Analyze latest results**: `php artisan monitor:analyze`
+- **Analyze one website**: `php artisan monitor:analyze --id=1`
+- **Analyze one result**: `php artisan monitor:analyze --result=42`
+
 ### Data Management Commands
 - **Prune old data (30 days)**: `php artisan monitor:prune`
 - **Prune with custom retention**: `php artisan monitor:prune --days=7`
@@ -150,6 +155,20 @@ Screenshots are taken using Spatie Browsershot with Puppeteer/Chrome via queue j
 - **Color coding**: Success (green), danger (red), info (blue), warning (yellow)
 - **Rich icons**: Contextual Heroicons for each notification type
 
+## AI Analysis
+
+Monitoring results are analyzed by Jev (TypeSafe's decision model) for severity, urgency, issue category, and whether the page looks broken or hacked. Full guide: `docs/ai-analysis.md`.
+
+- **Keys**: `JEV_API_KEY` (TypeSafe directly) and/or `OPENROUTER_API_KEY` (Jev via OpenRouter's decisions API, plus a vision model that reads screenshots). Nothing runs without a key.
+- **Services** (`app/Services/Ai/`): `JevClient` (decisions, experimental image input with `JEV_IMAGES=true`), `ScreenshotVisionClient` (OpenRouter chat completions with the screenshot), `MonitoringAnalysisService` (builds state, asks questions, stores outcome)
+- **Config**: `config/ai.php`
+- **Storage**: `monitoring_results.ai_severity`, `ai_urgency`, `ai_analysis` (JSON), `ai_analyzed_at`
+- **Flow**: `WebsiteMonitoringService::monitor()` queues `AnalyzeMonitoringResultJob` when AI is enabled; the job notifies admins at `AI_NOTIFY_MIN_SEVERITY` or on a likely compromise
+- **Command**: `php artisan monitor:analyze [--id=<website>] [--result=<result>]`
+- **Admin**: AI Severity column and filters, AI Analysis section, "Analyze with AI" action
+- **MCP**: `analyze-website` tool; AI fields included in results
+- **Tests**: `tests/Feature/MonitoringAnalysisTest.php` (HTTP faked)
+
 ## MCP Server
 
 The app exposes an MCP (Model Context Protocol) server via `laravel/mcp`, so AI clients (Claude Desktop, Claude Code, etc.) can query and manage monitoring.
@@ -164,6 +183,7 @@ The app exposes an MCP (Model Context Protocol) server via `laravel/mcp`, so AI 
   - `get-monitoring-history` - recent results with uptime % (filter by website, status, hours)
   - `get-latest-report` - recent monitoring email reports and their summaries
   - `run-monitoring` - queue `MonitorWebsiteJob`s for one or all active websites (needs a queue worker)
+  - `analyze-website` - run AI analysis on a website's latest result (or a given result)
   - `create-website`, `update-website`, `delete-website` - manage monitored websites
 - **Resource**: `monitoring://status/overview` - same data as `get-status-summary`
 - **Tests**: `tests/Feature/WebMonitoringMcpServerTest.php`
