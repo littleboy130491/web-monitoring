@@ -89,6 +89,7 @@ class MonitoringAnalysisService
 
         $analysis = $this->interpret($answers, $visual);
         $analysis['provider'] = $this->jev->provider();
+        $analysis['model'] = $this->jev->lastModel ?? $this->jev->model();
         $analysis['screenshot_source'] = $visual ? 'vision_model' : ($images ? 'jev' : null);
         $analysis['errors'] = $errors;
 

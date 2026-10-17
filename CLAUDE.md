@@ -166,7 +166,8 @@ Monitoring results are analyzed by Jev (TypeSafe's decision model) for severity,
 - **Flow**: `WebsiteMonitoringService::monitor()` queues `AnalyzeMonitoringResultJob` when AI is enabled; the job notifies admins at `AI_NOTIFY_MIN_SEVERITY` or on a likely compromise
 - **Command**: `php artisan monitor:analyze [--id=<website>] [--result=<result>]`
 - **Admin**: AI Severity column and filters, AI Analysis section, "Analyze with AI" action
-- **MCP**: `analyze-website` tool; AI fields included in results
+- **MCP**: `list-ai-findings` (across sites), `get-ai-analysis` (one site/result, optional raw Jev answers), `analyze-website` (run now); AI fields included in other results
+- **Jev versions**: `jev-latest` moves 1.13 -> 1.14 around 2026-10-21; stored analyses record `model`. Image assets use `{type: image, format, data_base64}`
 - **Tests**: `tests/Feature/MonitoringAnalysisTest.php` (HTTP faked)
 
 ## MCP Server
@@ -183,6 +184,8 @@ The app exposes an MCP (Model Context Protocol) server via `laravel/mcp`, so AI 
   - `get-monitoring-history` - recent results with uptime % (filter by website, status, hours)
   - `get-latest-report` - recent monitoring email reports and their summaries
   - `run-monitoring` - queue `MonitorWebsiteJob`s for one or all active websites (needs a queue worker)
+  - `list-ai-findings` - AI findings across all sites, most severe first
+  - `get-ai-analysis` - stored AI analysis for one website or result
   - `analyze-website` - run AI analysis on a website's latest result (or a given result)
   - `create-website`, `update-website`, `delete-website` - manage monitored websites
 - **Resource**: `monitoring://status/overview` - same data as `get-status-summary`

@@ -17,10 +17,14 @@ Web Monitor includes an [MCP (Model Context Protocol)](https://modelcontextproto
 | `get-monitoring-history` | Recent results with uptime %; filter by website, status or hours back |
 | `get-latest-report` | Recent monitoring email reports and their summaries |
 | `run-monitoring` | Queues checks for one website or all active ones |
+| `list-ai-findings` | AI findings across all sites, most severe first; filter by minimum severity, hacked only, broken only, hours |
+| `get-ai-analysis` | Stored AI analysis for one website or result, optionally with Jev's raw answers |
 | `analyze-website` | Runs AI analysis (severity, urgency, broken/hacked) on a website's latest result; see [ai-analysis.md](ai-analysis.md) |
 | `create-website` | Adds a website to monitor |
 | `update-website` | Changes a website; `is_active=false` pauses monitoring |
 | `delete-website` | Deletes a website and its monitoring results (marked destructive) |
+
+Example questions for your AI agent: "What did the AI find today?", "Is any of my sites hacked?", "Show me the AI analysis for example.com and Jev's raw answers".
 
 The server also offers a read-only resource, `monitoring://status/overview`, with the same data as `get-status-summary`.
 
